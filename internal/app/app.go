@@ -15,6 +15,7 @@ import (
 type App struct {
 	Config *config.ServerConfig
 	Db     *inmemory.Database
+	Short  *shortener.Shortener
 }
 
 func (app *App) Start() {
@@ -27,6 +28,7 @@ func (app *App) Start() {
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
+	log.Printf("Starting server on %s", srv.Addr)
 	err := srv.ListenAndServe()
 	log.Fatal(err)
 }
@@ -34,8 +36,14 @@ func (app *App) Start() {
 func (app *App) mainHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		sUrl := path.Base(r.URL.Path)
-		url, err := app.Db.GetFullUrl(inmemory.ShortUrl(sUrl))
+		log.Printf("Detected GET query from %s", r.URL.Path)
+		sURL := path.Base(r.URL.Path)
+		index, err := app.Short.Decode(sURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		url, err := app.Db.Retrieve(index)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -43,21 +51,22 @@ func (app *App) mainHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", string(url))
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	case http.MethodPost:
+		log.Printf("Detected POST query from %s", r.URL.Path)
 		b, _ := ioutil.ReadAll(r.Body)
 		url := inmemory.Url(b)
-		sUrl, err := shortener.GenereteShortString(string(url))
+		index, err := app.Db.Dump(url)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		err = app.Db.SaveShortUrl(inmemory.ShortUrl(sUrl), url)
+		sURL, err := app.Short.Encode(index)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write([]byte(fmt.Sprintf("http://%s/%s", r.Host, sUrl)))
+		_, err = w.Write([]byte(fmt.Sprintf("http://%s/%s", r.Host, sURL)))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

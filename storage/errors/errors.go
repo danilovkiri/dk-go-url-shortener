@@ -6,17 +6,17 @@ import (
 
 type (
 	StorageNotFoundError struct {
-		ShortURL string
+		ID int
 	}
 	StorageAlreadyExistsError struct {
-		ShortURL string
+		ID string
 	}
 )
 
 func (e *StorageNotFoundError) Error() string {
-	return fmt.Sprintf("%s not found in storage", e.ShortURL)
+	return fmt.Sprintf("%v not found in storage", e.ID)
 }
 
 func (e *StorageAlreadyExistsError) Error() string {
-	return fmt.Sprintf("%s already exists", e.ShortURL)
+	return fmt.Sprintf("%s already exists", e.ID)
 }

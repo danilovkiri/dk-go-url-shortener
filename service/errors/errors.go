@@ -1,11 +1,25 @@
 package errors
 
 type (
-	ServiceHashWriteError struct {
+	ServiceInitHashError struct {
+		Msg string
+	}
+	ServiceEncodingHashError struct {
+		Msg string
+	}
+	ServiceDecodingHashError struct {
 		Msg string
 	}
 )
 
-func (e *ServiceHashWriteError) Error() string {
+func (e *ServiceInitHashError) Error() string {
+	return e.Msg
+}
+
+func (e *ServiceEncodingHashError) Error() string {
+	return e.Msg
+}
+
+func (e *ServiceDecodingHashError) Error() string {
 	return e.Msg
 }
