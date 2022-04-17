@@ -72,6 +72,6 @@ func (app *App) mainHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	default:
-		http.Error(w, "Only GET and POST requests are allowed", http.StatusMethodNotAllowed)
+		http.Error(w, "Only GET and POST requests are allowed", http.StatusBadRequest)
 	}
 }
