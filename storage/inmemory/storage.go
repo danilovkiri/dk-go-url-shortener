@@ -1,43 +1,32 @@
 package inmemory
 
 import (
+	"context"
 	"github.com/danilovkiri/dk_go_url_shortener/storage/errors"
 )
 
-type (
-	ShortUrl string
-	Url      string
-	LastUsed int
-	Database struct {
-		StorageF map[LastUsed]Url
-		StorageR map[Url]LastUsed
-		LastUsed
-	}
-)
-
-func InitStorage() *Database {
-	db := &Database{
-		StorageF: make(map[LastUsed]Url),
-		StorageR: make(map[Url]LastUsed),
-		LastUsed: 0}
-	return db
+type Storage struct {
+	DB map[string]string
 }
 
-func (db *Database) Dump(url Url) (int, error) {
-	_, ok := db.StorageR[url]
-	if !ok {
-		db.LastUsed++
-		db.StorageF[db.LastUsed] = url
-		db.StorageR[url] = db.LastUsed
-		return int(db.LastUsed), nil
-	}
-	return int(db.LastUsed), &errors.StorageAlreadyExistsError{ID: string(url)}
+func InitStorage() *Storage {
+	db := make(map[string]string)
+	return &Storage{DB: db}
 }
 
-func (db *Database) Retrieve(index int) (Url, error) {
-	url, ok := db.StorageF[LastUsed(index)]
+func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
+	URL, ok := s.DB[sURL]
 	if !ok {
-		return "", &errors.StorageNotFoundError{ID: index}
+		return "", &errors.StorageNotFoundError{ID: sURL}
 	}
-	return url, nil
+	return URL, nil
+}
+
+func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
+	_, ok := s.DB[sURL]
+	if ok {
+		return &errors.StorageAlreadyExistsError{ID: sURL}
+	}
+	s.DB[sURL] = URL
+	return nil
 }
