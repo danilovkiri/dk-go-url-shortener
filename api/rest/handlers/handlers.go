@@ -31,7 +31,6 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 		sURL := chi.URLParam(r, "urlID")
 		log.Println("GET request detected for", sURL)
 		go func() {
-			time.Sleep(time.Second)
 			URL, err := h.svc.Decode(ctx, sURL)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusNotFound)
@@ -53,20 +52,33 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 
 func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Millisecond)
+		ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
 		defer cancel()
+		r = r.WithContext(ctx)
 		b, err := ioutil.ReadAll(r.Body)
-		log.Println("POST request detected", string(b))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		id, err := h.svc.Encode(ctx, string(b))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		handlePostDone := make(chan string)
+		log.Println("POST request detected for", string(b))
+		go func() {
+			id, err := h.svc.Encode(ctx, string(b))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			handlePostDone <- id
+		}()
+
+		select {
+		case <-ctx.Done():
+			log.Println("HandlePostURL:", ctx.Err())
+			w.WriteHeader(http.StatusGatewayTimeout)
+		case id := <-handlePostDone:
+			log.Println("HandlePostURL: stored", string(b), "as", id)
+			w.WriteHeader(http.StatusCreated)
+			w.Write([]byte("http://" + r.Host + "/" + id))
 		}
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://" + r.Host + "/" + id))
 	}
 }
