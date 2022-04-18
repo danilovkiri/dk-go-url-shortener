@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 )
 
 type URLHandler struct {
@@ -21,22 +22,39 @@ func InitURLHandler(svc shortener.Processor) (*URLHandler, error) {
 	return &URLHandler{svc: svc}, nil
 }
 
-func (h *URLHandler) HandleGetURL(ctx context.Context) http.HandlerFunc {
+func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
+		defer cancel()
+		r = r.WithContext(ctx)
+		handleGetDone := make(chan string)
 		sURL := chi.URLParam(r, "urlID")
 		log.Println("GET request detected for", sURL)
-		URL, err := h.svc.Decode(ctx, sURL)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
+		go func() {
+			time.Sleep(time.Second)
+			URL, err := h.svc.Decode(ctx, sURL)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusNotFound)
+			}
+			handleGetDone <- URL
+		}()
+
+		select {
+		case <-ctx.Done():
+			log.Println("HandleGetURL:", ctx.Err())
+			w.WriteHeader(http.StatusGatewayTimeout)
+		case URL := <-handleGetDone:
+			log.Println("HandleGetURL: retrieved URL", URL)
+			w.Header().Set("Location", URL)
+			w.WriteHeader(http.StatusTemporaryRedirect)
 		}
-		w.Header().Set("Location", URL)
-		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 }
 
-func (h *URLHandler) HandlePostURL(ctx context.Context) http.HandlerFunc {
+func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Millisecond)
+		defer cancel()
 		b, err := ioutil.ReadAll(r.Body)
 		log.Println("POST request detected", string(b))
 		if err != nil {

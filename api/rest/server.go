@@ -26,11 +26,11 @@ func InitServer(ctx context.Context) (server *http.Server, err error) {
 		return nil, err
 	}
 	r := chi.NewRouter()
-	r.Post("/", urlHandler.HandlePostURL(ctx))
-	r.Get("/{urlID}", urlHandler.HandleGetURL(ctx))
+	r.Post("/", urlHandler.HandlePostURL())
+	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	srv := &http.Server{
 		Addr:         host + ":" + port,
-		Handler:      r,
+		Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
 		IdleTimeout:  10 * time.Second,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
