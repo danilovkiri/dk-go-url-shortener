@@ -1,3 +1,4 @@
+// Package errors provides custom errors for types implementing URLSetter, URLGetter and URLStorage interfaces.
 package errors
 
 import (

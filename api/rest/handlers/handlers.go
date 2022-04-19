@@ -1,3 +1,4 @@
+// Package handlers provides http.HandlerFunc handler functions to be used for endpoints.
 package handlers
 
 import (
@@ -11,10 +12,12 @@ import (
 	"time"
 )
 
+// URLHandler defines data structure handling and provides support for adding new implementations.
 type URLHandler struct {
 	svc shortener.Processor
 }
 
+// InitURLHandler initializes a URLHandler object and sets its attributes.
 func InitURLHandler(svc shortener.Processor) (*URLHandler, error) {
 	if svc == nil {
 		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
@@ -22,6 +25,7 @@ func InitURLHandler(svc shortener.Processor) (*URLHandler, error) {
 	return &URLHandler{svc: svc}, nil
 }
 
+// HandleGetURL provides functionality for handling GET requests.
 func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
@@ -54,6 +58,7 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	}
 }
 
+// HandlePostURL provides functionality for handling POST requests.
 func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2000*time.Millisecond)

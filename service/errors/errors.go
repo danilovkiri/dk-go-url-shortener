@@ -1,3 +1,4 @@
+// Package errors provides custom errors for types implementing Processor interface.
 package errors
 
 type (

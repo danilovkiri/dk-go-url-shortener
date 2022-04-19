@@ -1,3 +1,4 @@
+// Package shortener provides functionality for creating a short unique identifier for a string.
 package shortener
 
 import (
@@ -13,6 +14,7 @@ import (
 const SaltKey = "Some Hashing Key"
 const MinLength = 5
 
+// Shortener struct defines data structure handling and provides support for adding new implementations.
 type Shortener struct {
 	SaltKey    string
 	MinLength  int
@@ -20,6 +22,7 @@ type Shortener struct {
 	URLStorage storage.URLStorage
 }
 
+// InitShortener initializes a Shortener object and sets its attributes.
 func InitShortener(s storage.URLStorage) (*Shortener, error) {
 	if s == nil {
 		return nil, &errors.ServiceFoundNilStorage{Msg: "nil storage was passed to service initializer"}
@@ -40,6 +43,7 @@ func InitShortener(s storage.URLStorage) (*Shortener, error) {
 	return shortener, nil
 }
 
+// Encode generates a sURL, stores URL and sURL in a storage, and returns sURL.
 func (short *Shortener) Encode(ctx context.Context, URL string) (sURL string, err error) {
 	_, err = url.ParseRequestURI(URL)
 	if err != nil {
@@ -56,6 +60,7 @@ func (short *Shortener) Encode(ctx context.Context, URL string) (sURL string, er
 	return sURL, nil
 }
 
+// Decode retrieved and returns URL based on the given sURL as a key.
 func (short *Shortener) Decode(ctx context.Context, sURL string) (URL string, err error) {
 	URL, err = short.URLStorage.Retrieve(ctx, sURL)
 	if err != nil {
@@ -64,6 +69,7 @@ func (short *Shortener) Decode(ctx context.Context, sURL string) (URL string, er
 	return URL, nil
 }
 
+// generateSlug generates and returns a short unique identifier for a string.
 func (short *Shortener) generateSlug() (slug string, err error) {
 	now := time.Now().UnixNano()
 	slug, err = short.hashID.Encode([]int{int(now)})
