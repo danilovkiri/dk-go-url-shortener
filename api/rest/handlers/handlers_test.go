@@ -9,7 +9,6 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -79,13 +78,11 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 			if err != nil {
 				t.Fatalf(err.Error())
 			}
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				if err != nil {
-					t.Fatalf(err.Error())
-				}
-			}(res.Body)
 			assert.Equal(t, tt.want.code, res.StatusCode)
+			err = res.Body.Close()
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
 		})
 	}
 }
@@ -139,14 +136,11 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 			if err != nil {
 				t.Errorf(err.Error())
 			}
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				if err != nil {
-					t.Errorf(err.Error())
-				}
-			}(res.Body)
 			assert.Equal(t, tt.want.code, res.StatusCode)
-
+			err = res.Body.Close()
+			if err != nil {
+				t.Errorf(err.Error())
+			}
 		})
 	}
 }
