@@ -1,3 +1,4 @@
+// Package errors provides custom errors for types implementing Processor interface.
 package errors
 
 type (
@@ -7,7 +8,10 @@ type (
 	ServiceEncodingHashError struct {
 		Msg string
 	}
-	ServiceDecodingHashError struct {
+	ServiceFoundNilStorage struct {
+		Msg string
+	}
+	ServiceIncorrectInputURL struct {
 		Msg string
 	}
 )
@@ -20,6 +24,10 @@ func (e *ServiceEncodingHashError) Error() string {
 	return e.Msg
 }
 
-func (e *ServiceDecodingHashError) Error() string {
+func (e *ServiceFoundNilStorage) Error() string {
+	return e.Msg
+}
+
+func (e *ServiceIncorrectInputURL) Error() string {
 	return e.Msg
 }
