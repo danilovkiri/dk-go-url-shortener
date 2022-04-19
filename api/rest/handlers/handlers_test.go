@@ -75,6 +75,7 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 				},
 			}
 			res, err := client.Do(req)
+			defer res.Body.Close()
 			if err != nil {
 				t.Fatalf(err.Error())
 			} else {
@@ -82,7 +83,6 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 					t.Fatalf("Expected status code %d, got %d", tt.want.code, res.StatusCode)
 				}
 			}
-
 		})
 	}
 }
@@ -133,6 +133,7 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 			}
 			client := &http.Client{}
 			res, err := client.Do(req)
+			defer res.Body.Close()
 			if err != nil {
 				t.Errorf(err.Error())
 			}
