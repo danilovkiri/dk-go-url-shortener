@@ -24,16 +24,17 @@ func InitURLHandler(svc shortener.Processor) (*URLHandler, error) {
 
 func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
 		r = r.WithContext(ctx)
 		handleGetDone := make(chan string)
+		handleGetError := make(chan string)
 		sURL := chi.URLParam(r, "urlID")
 		log.Println("GET request detected for", sURL)
 		go func() {
 			URL, err := h.svc.Decode(ctx, sURL)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				handleGetError <- err.Error()
 			}
 			handleGetDone <- URL
 		}()
@@ -46,13 +47,16 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 			log.Println("HandleGetURL: retrieved URL", URL)
 			w.Header().Set("Location", URL)
 			w.WriteHeader(http.StatusTemporaryRedirect)
+		case errString := <-handleGetError:
+			log.Println("HandleGetURL:", errString)
+			http.Error(w, errString, http.StatusNotFound)
 		}
 	}
 }
 
 func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 200*time.Millisecond)
+		ctx, cancel := context.WithTimeout(r.Context(), 2000*time.Millisecond)
 		defer cancel()
 		r = r.WithContext(ctx)
 		b, err := ioutil.ReadAll(r.Body)
@@ -61,11 +65,12 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			return
 		}
 		handlePostDone := make(chan string)
+		handlePostError := make(chan string)
 		log.Println("POST request detected for", string(b))
 		go func() {
 			id, err := h.svc.Encode(ctx, string(b))
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				handlePostError <- err.Error()
 				return
 			}
 			handlePostDone <- id
@@ -79,6 +84,9 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			log.Println("HandlePostURL: stored", string(b), "as", id)
 			w.WriteHeader(http.StatusCreated)
 			w.Write([]byte("http://" + r.Host + "/" + id))
+		case errString := <-handlePostError:
+			log.Println("HandlePostURL:", errString)
+			http.Error(w, errString, http.StatusBadRequest)
 		}
 	}
 }

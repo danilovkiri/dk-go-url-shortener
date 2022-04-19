@@ -29,8 +29,9 @@ func InitServer(ctx context.Context) (server *http.Server, err error) {
 	r.Post("/", urlHandler.HandlePostURL())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	srv := &http.Server{
-		Addr:         host + ":" + port,
-		Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
+		Addr: host + ":" + port,
+		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
+		Handler:      r,
 		IdleTimeout:  10 * time.Second,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
