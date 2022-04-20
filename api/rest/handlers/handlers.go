@@ -28,9 +28,11 @@ func InitURLHandler(svc shortener.Processor) (*URLHandler, error) {
 // HandleGetURL provides functionality for handling GET requests.
 func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// set context timeout to 500 ms for timing server DB operations
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
 		r = r.WithContext(ctx)
+		// create channels for listening to the go routine result
 		handleGetDone := make(chan string)
 		handleGetError := make(chan string)
 		sURL := chi.URLParam(r, "urlID")
@@ -43,6 +45,7 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 			handleGetDone <- URL
 		}()
 
+		// wait for the first channel to retrieve a value
 		select {
 		case <-ctx.Done():
 			log.Println("HandleGetURL:", ctx.Err())
@@ -61,7 +64,8 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 // HandlePostURL provides functionality for handling POST requests.
 func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 2000*time.Millisecond)
+		// set context timeout to 500 ms for timing server DB operations
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
 		r = r.WithContext(ctx)
 		b, err := ioutil.ReadAll(r.Body)
@@ -69,6 +73,7 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		// create channels for listening to the go routine result
 		handlePostDone := make(chan string)
 		handlePostError := make(chan string)
 		log.Println("POST request detected for", string(b))
@@ -81,6 +86,7 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			handlePostDone <- id
 		}()
 
+		// wait for the first channel to retrieve a value
 		select {
 		case <-ctx.Done():
 			log.Println("HandlePostURL:", ctx.Err())

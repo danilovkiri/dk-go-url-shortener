@@ -16,7 +16,7 @@ const (
 	port = "8080"
 )
 
-// InitServer returns an http.Server object ready to be listening and serving .
+// InitServer returns a http.Server object ready to be listening and serving .
 func InitServer(ctx context.Context) (server *http.Server, err error) {
 	storage := inmemory.InitStorage()
 	shortenerService, err := shortener.InitShortener(storage)
