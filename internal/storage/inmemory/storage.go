@@ -6,7 +6,6 @@ import (
 	"context"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"log"
-	"time"
 )
 
 // Storage struct defines data structure handling and provides support for adding new implementations.
@@ -22,10 +21,6 @@ func InitStorage() *Storage {
 
 // Retrieve returns a URL as a value of a map based on the given sURL as a key of a map.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
-	// set context timeout to 500 ms for timing DB operations
-	ctxRetrieve, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan string)
 	retrieveError := make(chan string)
@@ -40,8 +35,8 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 
 	// wait for the first channel to retrieve a value
 	select {
-	case <-ctxRetrieve.Done():
-		log.Println("Retrieving URL:", ctxRetrieve.Err())
+	case <-ctx.Done():
+		log.Println("Retrieving URL:", ctx.Err())
 		return "", errors.ContextTimeoutExceededError{}
 	case errString := <-retrieveError:
 		log.Println("Retrieving URL:", errString)
@@ -54,10 +49,6 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 
 // Dump stores a pair of sURL and URL as a key-value pair in a map.
 func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
-	// set context timeout to 500 ms for timing DB operations
-	ctxDump, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-
 	// create channels for listening to the go routine result
 	dumpDone := make(chan bool)
 	dumpError := make(chan string)
@@ -73,8 +64,8 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
 
 	// wait for the first channel to retrieve a value
 	select {
-	case <-ctxDump.Done():
-		log.Println("Dumping URL:", ctxDump.Err())
+	case <-ctx.Done():
+		log.Println("Dumping URL:", ctx.Err())
 		return errors.ContextTimeoutExceededError{}
 	case errString := <-dumpError:
 		log.Println("Dumping URL:", errString)

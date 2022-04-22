@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
@@ -10,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 )
 
 // URLHandler defines data structure handling and provides support for adding new implementations.
@@ -28,7 +30,11 @@ func InitURLHandler(processor shortener.Processor) (*URLHandler, error) {
 // HandleGetURL provides functionality for handling GET requests.
 func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+		// set context timeout to 500 ms for timing DB operations
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+
+		// execute main body
 		sURL := chi.URLParam(r, "urlID")
 		log.Println("GET request detected for", sURL)
 		URL, err := h.processor.Decode(ctx, sURL)
@@ -51,7 +57,11 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 // HandlePostURL provides functionality for handling POST requests.
 func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
+		// set context timeout to 500 ms for timing DB operations
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+
+		// execute main body
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
