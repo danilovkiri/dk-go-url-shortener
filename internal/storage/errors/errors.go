@@ -12,12 +12,18 @@ type (
 	StorageAlreadyExistsError struct {
 		ID string
 	}
+	ContextTimeoutExceededError struct {
+	}
 )
 
-func (e *StorageNotFoundError) Error() string {
+func (e StorageNotFoundError) Error() string {
 	return fmt.Sprintf("%s not found in storage", e.ID)
 }
 
-func (e *StorageAlreadyExistsError) Error() string {
+func (e StorageAlreadyExistsError) Error() string {
 	return fmt.Sprintf("%s already exists", e.ID)
+}
+
+func (e ContextTimeoutExceededError) Error() string {
+	return fmt.Sprintf("context timeout exceeded")
 }

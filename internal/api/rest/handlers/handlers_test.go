@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"context"
-	shortenerService "github.com/danilovkiri/dk_go_url_shortener/service/shortener"
-	"github.com/danilovkiri/dk_go_url_shortener/service/shortener/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/storage"
-	"github.com/danilovkiri/dk_go_url_shortener/storage/inmemory"
+	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/inmemory"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
