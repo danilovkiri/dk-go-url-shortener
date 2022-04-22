@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/danilovkiri/dk_go_url_shortener/api/rest"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest"
 )
 
 func main() {

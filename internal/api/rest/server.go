@@ -3,9 +3,9 @@ package rest
 
 import (
 	"context"
-	"github.com/danilovkiri/dk_go_url_shortener/api/rest/handlers"
-	"github.com/danilovkiri/dk_go_url_shortener/service/shortener/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/storage/inmemory"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/inmemory"
 	"github.com/go-chi/chi"
 	"net/http"
 	"time"
@@ -16,7 +16,7 @@ const (
 	port = "8080"
 )
 
-// InitServer returns an http.Server object ready to be listening and serving .
+// InitServer returns a http.Server object ready to be listening and serving .
 func InitServer(ctx context.Context) (server *http.Server, err error) {
 	storage := inmemory.InitStorage()
 	shortenerService, err := shortener.InitShortener(storage)

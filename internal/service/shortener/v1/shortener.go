@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/danilovkiri/dk_go_url_shortener/service/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/storage"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
 	"github.com/speps/go-hashids/v2"
 )
 
