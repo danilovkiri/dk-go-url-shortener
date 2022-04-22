@@ -25,5 +25,5 @@ func (e StorageAlreadyExistsError) Error() string {
 }
 
 func (e ContextTimeoutExceededError) Error() string {
-	return fmt.Sprintf("context timeout exceeded")
+	return fmt.Sprintln("context timeout exceeded")
 }
