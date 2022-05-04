@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/model"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
@@ -129,6 +131,64 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 			if err != nil {
 				t.Fatalf("Could not create POST request")
 			}
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+}
+
+func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
+	suite.router.Post("/api/shorten", suite.urlHandler.JSONHandlePostURL())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name string
+		URL  model.RequestURL
+		want want
+	}{
+		{
+			name: "Correct POST query",
+			URL: model.RequestURL{
+				URL: "https://www.yandex.ru",
+			},
+			want: want{
+				code: 201,
+			},
+		},
+		{
+			name: "Invalid POST query (empty query)",
+			URL: model.RequestURL{
+				URL: "",
+			},
+			want: want{
+				code: 400,
+			},
+		},
+		{
+			name: "Invalid POST query (not URL)",
+			URL: model.RequestURL{
+				URL: "kke738enb734b",
+			},
+			want: want{
+				code: 400,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			reqBody, _ := json.Marshal(tt.URL)
+			payload := strings.NewReader(string(reqBody))
+			client := resty.New()
+			res, err := client.R().SetBody(payload).Post(suite.ts.URL + "/api/shorten")
+			if err != nil {
+				t.Fatalf("Could not perform JSON POST request")
+			}
+			t.Logf(string(res.Body()))
 			assert.Equal(t, tt.want.code, res.StatusCode())
 		})
 	}

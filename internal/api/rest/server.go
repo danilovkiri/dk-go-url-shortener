@@ -30,6 +30,7 @@ func InitServer(ctx context.Context) (server *http.Server, err error) {
 	r := chi.NewRouter()
 	r.Post("/", urlHandler.HandlePostURL())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
+	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
 	srv := &http.Server{
 		Addr: host + ":" + port,
 		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
