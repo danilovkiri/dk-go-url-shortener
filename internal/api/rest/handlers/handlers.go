@@ -7,26 +7,29 @@ import (
 	"errors"
 	"fmt"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/model"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"github.com/go-chi/chi"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 )
 
 // URLHandler defines data structure handling and provides support for adding new implementations.
 type URLHandler struct {
-	processor shortener.Processor
+	processor    shortener.Processor
+	serverConfig *config.ServerConfig
 }
 
 // InitURLHandler initializes a URLHandler object and sets its attributes.
-func InitURLHandler(processor shortener.Processor) (*URLHandler, error) {
+func InitURLHandler(processor shortener.Processor, serverConfig *config.ServerConfig) (*URLHandler, error) {
 	if processor == nil {
 		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
 	}
-	return &URLHandler{processor: processor}, nil
+	return &URLHandler{processor: processor, serverConfig: serverConfig}, nil
 }
 
 // HandleGetURL provides client with a redirect to the original URL accessed by shortened URL.
@@ -85,7 +88,12 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 		log.Println("HandlePostURL: stored", string(b), "as", id)
 		// set and send response
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://" + r.Host + "/" + id))
+		u := &url.URL{
+			Scheme: "http",
+			Host:   h.serverConfig.BaseURL,
+			Path:   id,
+		}
+		w.Write([]byte(u.String()))
 	}
 }
 
@@ -127,8 +135,13 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		}
 		log.Println("JSONHandlePostURL: stored", post.URL, "as", id)
 		// serialize struct into JSON
+		u := &url.URL{
+			Scheme: "http",
+			Host:   h.serverConfig.BaseURL,
+			Path:   id,
+		}
 		resData := model.ResponseURL{
-			ShortURL: "http://" + r.Host + "/" + id,
+			ShortURL: u.String(),
 		}
 		resBody, err := json.Marshal(resData)
 		if err != nil {

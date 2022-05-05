@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/model"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
@@ -30,7 +31,8 @@ type HandlersTestSuite struct {
 func (suite *HandlersTestSuite) SetupTest() {
 	suite.storage = inmemory.InitStorage()
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
-	suite.urlHandler, _ = InitURLHandler(suite.shortenerService)
+	cfg, _ := config.NewDefaultConfiguration()
+	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
 }
