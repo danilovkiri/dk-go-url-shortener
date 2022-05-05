@@ -105,6 +105,7 @@ func (s *Storage) restore() error {
 	err = decoder.Decode(&storageEntries)
 	if err != nil {
 		// decoding an empty file results in EOF error
+		log.Println("Attempted to restore DB from empty file")
 	}
 	log.Print("DB was restored")
 	for _, entry := range storageEntries {

@@ -11,8 +11,8 @@ type Config struct {
 
 // ServerConfig defines default server-relates constants and parameters and overwrites them with environment variables.
 type ServerConfig struct {
-	ServerAddress string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
-	BaseURL       string `env:"BASE_URL" envDefault:"localhost:8080"`
+	ServerAddress string `env:"SERVER_ADDRESS" envDefault:":8080"`
+	BaseURL       string `env:"BASE_URL" envDefault:"http://localhost:8080"`
 }
 
 // StorageConfig retrieves file storage-related parameters from environment.

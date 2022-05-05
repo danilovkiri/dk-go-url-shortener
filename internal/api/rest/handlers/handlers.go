@@ -88,11 +88,8 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 		log.Println("HandlePostURL: stored", string(b), "as", id)
 		// set and send response
 		w.WriteHeader(http.StatusCreated)
-		u := &url.URL{
-			Scheme: "http",
-			Host:   h.serverConfig.BaseURL,
-			Path:   id,
-		}
+		u, err := url.Parse(h.serverConfig.BaseURL)
+		u.Path = id
 		w.Write([]byte(u.String()))
 	}
 }
@@ -135,11 +132,11 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		}
 		log.Println("JSONHandlePostURL: stored", post.URL, "as", id)
 		// serialize struct into JSON
-		u := &url.URL{
-			Scheme: "http",
-			Host:   h.serverConfig.BaseURL,
-			Path:   id,
+		u, err := url.Parse(h.serverConfig.BaseURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
+		u.Path = id
 		resData := model.ResponseURL{
 			ShortURL: u.String(),
 		}
