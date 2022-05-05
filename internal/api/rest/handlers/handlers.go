@@ -89,6 +89,9 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 		// set and send response
 		w.WriteHeader(http.StatusCreated)
 		u, err := url.Parse(h.serverConfig.BaseURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 		u.Path = id
 		w.Write([]byte(u.String()))
 	}
