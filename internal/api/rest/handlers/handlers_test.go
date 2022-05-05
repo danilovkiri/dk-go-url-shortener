@@ -8,7 +8,7 @@ import (
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/inmemory"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
@@ -29,9 +29,9 @@ type HandlersTestSuite struct {
 }
 
 func (suite *HandlersTestSuite) SetupTest() {
-	suite.storage = inmemory.InitStorage()
-	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	cfg, _ := config.NewDefaultConfiguration()
+	suite.storage, _ = infile.InitStorage(cfg.StorageConfig)
+	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
