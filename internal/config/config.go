@@ -14,13 +14,13 @@ type Config struct {
 
 // ServerConfig defines default server-relates constants and parameters and overwrites them with environment variables.
 type ServerConfig struct {
-	ServerAddress string `env:"SERVER_ADDRESS" envDefault:":8080"`
-	BaseURL       string `env:"BASE_URL" envDefault:"http://localhost:8080"`
+	ServerAddress string `env:"SERVER_ADDRESS"`
+	BaseURL       string `env:"BASE_URL"`
 }
 
 // StorageConfig retrieves file storage-related parameters from environment.
 type StorageConfig struct {
-	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"url_storage.json"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"storage/infile/url_storage.json"`
 }
 
 // NewStorageConfig sets up a storage configuration.
@@ -63,6 +63,6 @@ func NewDefaultConfiguration() (*Config, error) {
 func (c *Config) ParseFlags() {
 	flag.StringVar(&c.ServerConfig.ServerAddress, "a", ":8080", "Server address")
 	flag.StringVar(&c.ServerConfig.BaseURL, "b", "http://localhost:8080", "Base url")
-	flag.StringVar(&c.StorageConfig.FileStoragePath, "f", "url_storage.json", "File storage path")
+	flag.StringVar(&c.StorageConfig.FileStoragePath, "f", "storage/infile/url_storage.json", "File storage path")
 	flag.Parse()
 }
