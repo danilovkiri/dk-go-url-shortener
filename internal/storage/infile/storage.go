@@ -40,7 +40,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	go func() {
 		s.mu.Lock()
 		URL, ok := s.DB[sURL]
-		defer s.mu.Unlock()
+		s.mu.Unlock()
 		if !ok {
 			retrieveError <- "not found in DB"
 			return

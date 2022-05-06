@@ -30,6 +30,8 @@ type HandlersTestSuite struct {
 
 func (suite *HandlersTestSuite) SetupTest() {
 	cfg, _ := config.NewDefaultConfiguration()
+	// parsing flags causes flag redefined errors
+	//cfg.ParseFlags()
 	suite.storage, _ = infile.InitStorage(cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
