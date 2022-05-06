@@ -15,7 +15,7 @@ type Config struct {
 // ServerConfig defines default server-relates constants and parameters and overwrites them with environment variables.
 type ServerConfig struct {
 	ServerAddress string `env:"SERVER_ADDRESS" default:":8080"`
-	BaseURL       string `env:"BASE_URL" default:"http://localhost:8080"`
+	BaseURL       string `env:"BASE_URL" default:"http://127.0.0.1:8080"`
 }
 
 // StorageConfig retrieves file storage-related parameters from environment.
@@ -62,7 +62,7 @@ func NewDefaultConfiguration() (*Config, error) {
 // ParseFlags parses command line arguments and stores them
 func (c *Config) ParseFlags() {
 	flag.StringVar(&c.ServerConfig.ServerAddress, "a", ":8080", "Server address")
-	flag.StringVar(&c.ServerConfig.BaseURL, "b", "http://localhost:8080", "Base url")
+	flag.StringVar(&c.ServerConfig.BaseURL, "b", "http://127.0.0.1:8080", "Base url")
 	flag.StringVar(&c.StorageConfig.FileStoragePath, "f", "url_storage.json", "File storage path")
 	flag.Parse()
 }
