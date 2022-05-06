@@ -14,13 +14,13 @@ type Config struct {
 
 // ServerConfig defines default server-relates constants and parameters and overwrites them with environment variables.
 type ServerConfig struct {
-	ServerAddress string `env:"SERVER_ADDRESS" default:":8080"`
-	BaseURL       string `env:"BASE_URL" default:"http://127.0.0.1:8080"`
+	ServerAddress string `env:"SERVER_ADDRESS"`
+	BaseURL       string `env:"BASE_URL"`
 }
 
 // StorageConfig retrieves file storage-related parameters from environment.
 type StorageConfig struct {
-	FileStoragePath string `env:"FILE_STORAGE_PATH" envDefault:"url_storage.json"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 }
 
 // NewStorageConfig sets up a storage configuration.
@@ -61,8 +61,17 @@ func NewDefaultConfiguration() (*Config, error) {
 
 // ParseFlags parses command line arguments and stores them
 func (c *Config) ParseFlags() {
-	flag.StringVar(&c.ServerConfig.ServerAddress, "a", ":8080", "Server address")
-	flag.StringVar(&c.ServerConfig.BaseURL, "b", "http://127.0.0.1:8080", "Base url")
-	flag.StringVar(&c.StorageConfig.FileStoragePath, "f", "url_storage.json", "File storage path")
+	a := flag.String("a", ":8080", "Server address")
+	b := flag.String("b", "http://localhost:8080", "Base url")
+	f := flag.String("f", "url_storage.json", "File storage path")
 	flag.Parse()
+	if c.ServerConfig.ServerAddress == "" {
+		c.ServerConfig.ServerAddress = *a
+	}
+	if c.ServerConfig.BaseURL == "" {
+		c.ServerConfig.BaseURL = *b
+	}
+	if c.StorageConfig.FileStoragePath == "" {
+		c.StorageConfig.FileStoragePath = *f
+	}
 }
