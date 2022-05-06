@@ -1,7 +1,10 @@
 // Package config provides types for handling configuration parameters.
 package config
 
-import "github.com/caarlos0/env/v6"
+import (
+	"flag"
+	"github.com/caarlos0/env/v6"
+)
 
 // Config handles server-related constants and parameters.
 type Config struct {
@@ -54,4 +57,12 @@ func NewDefaultConfiguration() (*Config, error) {
 		ServerConfig:  serverCfg,
 		StorageConfig: storageCfg,
 	}, nil
+}
+
+// ParseFlags parses command line arguments and stores them
+func (c *Config) ParseFlags() {
+	flag.StringVar(&c.ServerConfig.ServerAddress, "a", ":8080", "Server address")
+	flag.StringVar(&c.ServerConfig.BaseURL, "b", "http://localhost:8080", "Base url")
+	flag.StringVar(&c.StorageConfig.FileStoragePath, "f", "url_storage.json", "File storage path")
+	flag.Parse()
 }

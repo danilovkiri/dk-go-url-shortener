@@ -20,6 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg.ParseFlags()
 	// initialize (or retrieve if present) storage
 	storage, err := infile.InitStorage(cfg.StorageConfig)
 	if err != nil {
