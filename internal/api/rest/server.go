@@ -24,7 +24,8 @@ func InitServer(ctx context.Context, cfg *config.Config, storage *infile.Storage
 		return nil, err
 	}
 	r := chi.NewRouter()
-	r.Use(middleware.GzipHandle)
+	r.Use(middleware.CompressHandle)
+	r.Use(middleware.DecompressHandle)
 	r.Post("/", urlHandler.HandlePostURL())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
