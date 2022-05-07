@@ -4,6 +4,7 @@ package rest
 import (
 	"context"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
@@ -23,6 +24,7 @@ func InitServer(ctx context.Context, cfg *config.Config, storage *infile.Storage
 		return nil, err
 	}
 	r := chi.NewRouter()
+	r.Use(middleware.GzipHandle)
 	r.Post("/", urlHandler.HandlePostURL())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())

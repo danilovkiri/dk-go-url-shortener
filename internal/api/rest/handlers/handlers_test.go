@@ -30,7 +30,7 @@ type HandlersTestSuite struct {
 
 func (suite *HandlersTestSuite) SetupTest() {
 	cfg, _ := config.NewDefaultConfiguration()
-	// necessary to set default parameters since they are set in cfg.ParseFlags() which causes errors
+	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
