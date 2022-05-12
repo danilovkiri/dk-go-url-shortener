@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/model"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"

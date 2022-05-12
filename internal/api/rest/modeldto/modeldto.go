@@ -1,5 +1,5 @@
-// Package model provides locally used types and their structure.
-package model
+// Package modeldto provides locally used types and their structure for data transfer objects.
+package modeldto
 
 type (
 	RequestURL struct {

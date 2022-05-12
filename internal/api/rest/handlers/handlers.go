@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/model"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
@@ -114,7 +114,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			return
 		}
 		// deserialize JSON into struct
-		var post model.RequestURL
+		var post modeldto.RequestURL
 		err = json.Unmarshal(b, &post)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -140,7 +140,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 		u.Path = id
-		resData := model.ResponseURL{
+		resData := modeldto.ResponseURL{
 			ShortURL: u.String(),
 		}
 		resBody, err := json.Marshal(resData)

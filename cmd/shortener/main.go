@@ -9,12 +9,18 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// add a waiting group
+	wg := &sync.WaitGroup{}
+	// set number of wg members to 1 (this will be the persistStorage goroutine)
+	wg.Add(1)
 	// get configuration
 	cfg, err := config.NewDefaultConfiguration()
 	if err != nil {
@@ -22,7 +28,7 @@ func main() {
 	}
 	cfg.ParseFlags()
 	// initialize (or retrieve if present) storage
-	storage, err := infile.InitStorage(cfg.StorageConfig)
+	storage, err := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,29 +37,25 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// start up the server
-	go func() {
-		log.Print("Server start attempted")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
-		}
-	}()
-	// graceful shutdown
+	// set a listener for os.Signal
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-done
-	log.Print("Server shutdown attempted")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatal("Server shutdown failed:", err)
-	}
-	log.Print("Server shutdown succeeded")
-	// defer dumping tmpfs storage into file upon server shutdown attempt
-	defer func() {
-		cancel()
-		err := storage.PersistStorage()
-		if err != nil {
-			log.Fatal(err)
+	go func() {
+		<-done
+		log.Print("Server shutdown attempted")
+		ctxTO, cancelTO := context.WithTimeout(ctx, 5*time.Second)
+		defer cancelTO()
+		if err := server.Shutdown(ctxTO); err != nil {
+			log.Fatal("Server shutdown failed:", err)
 		}
+		log.Print("Server shutdown succeeded")
+		cancel()
 	}()
+	// start up the server
+	log.Print("Server start attempted")
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+	// wait for goroutine in InitStorage to finish before exiting
+	wg.Wait()
 }

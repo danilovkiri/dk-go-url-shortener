@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/model"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
 	"log"
 	"os"
 	"sync"
@@ -18,8 +18,8 @@ type Storage struct {
 	DB  map[string]string
 }
 
-// InitStorage initializes a Storage object and sets its attributes.
-func InitStorage(cfg *config.StorageConfig) (*Storage, error) {
+// InitStorage initializes a Storage object, sets its attributes and starts a listener for persistStorage.
+func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
 	db := make(map[string]string)
 	st := Storage{
 		DB:  db,
@@ -29,6 +29,16 @@ func InitStorage(cfg *config.StorageConfig) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
+	// start a goroutine to listen for ctx cancellation followed by persistStorage call
+	// use sync.WaitGroup to prevent goroutine premature termination when main exits
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		err := st.persistStorage()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
 	return &st, nil
 }
 
@@ -95,7 +105,7 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
 
 // restore fills the tmpfs DB with URL-sURL entries from file storage.
 func (s *Storage) restore() error {
-	var storageEntries []model.URLStorageEntry
+	var storageEntries []modelstorage.URLStorageEntry
 	file, err := os.OpenFile(s.Cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0777)
 	if err != nil {
 		return err
@@ -114,9 +124,10 @@ func (s *Storage) restore() error {
 	return nil
 }
 
-// PersistStorage appends the tmpfs DB contents to a file storage.
-func (s *Storage) PersistStorage() error {
+// persistStorage appends the tmpfs DB contents to a file storage.
+func (s *Storage) persistStorage() error {
 	if len(s.DB) == 0 {
+		log.Print("Empty DB to be saved")
 		return nil
 	}
 	file, err := os.OpenFile(s.Cfg.FileStoragePath, os.O_RDWR|os.O_CREATE, 0777)
@@ -125,9 +136,9 @@ func (s *Storage) PersistStorage() error {
 	}
 	defer file.Close()
 	encoder := json.NewEncoder(file)
-	var rows []model.URLStorageEntry
+	var rows []modelstorage.URLStorageEntry
 	for sURL, URL := range s.DB {
-		rowToEncode := model.URLStorageEntry{
+		rowToEncode := modelstorage.URLStorageEntry{
 			SURL: sURL,
 			URL:  URL,
 		}

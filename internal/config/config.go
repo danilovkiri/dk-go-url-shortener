@@ -59,19 +59,32 @@ func NewDefaultConfiguration() (*Config, error) {
 	}, nil
 }
 
+// isFlagPassed checks whether the flag was set in CLI
+func isFlagPassed(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
+}
+
 // ParseFlags parses command line arguments and stores them
 func (c *Config) ParseFlags() {
 	a := flag.String("a", ":8080", "Server address")
 	b := flag.String("b", "http://localhost:8080", "Base url")
 	f := flag.String("f", "url_storage.json", "File storage path")
 	flag.Parse()
-	if c.ServerConfig.ServerAddress == "" {
+	// priority: flag -> env -> default env
+	// note that env parsing precedes flag parsing
+	if isFlagPassed("a") || c.ServerConfig.ServerAddress == "" {
 		c.ServerConfig.ServerAddress = *a
 	}
-	if c.ServerConfig.BaseURL == "" {
+	if isFlagPassed("b") || c.ServerConfig.BaseURL == "" {
 		c.ServerConfig.BaseURL = *b
 	}
-	if c.StorageConfig.FileStoragePath == "" {
+	if isFlagPassed("f") || c.StorageConfig.FileStoragePath == "" {
 		c.StorageConfig.FileStoragePath = *f
 	}
 }
