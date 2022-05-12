@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
@@ -15,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -25,6 +27,9 @@ type HandlersTestSuite struct {
 	urlHandler       *URLHandler
 	router           *chi.Mux
 	ts               *httptest.Server
+	ctx              context.Context
+	cancel           context.CancelFunc
+	wg               *sync.WaitGroup
 }
 
 func (suite *HandlersTestSuite) SetupTest() {
@@ -33,9 +38,17 @@ func (suite *HandlersTestSuite) SetupTest() {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+
+	//ctx := context.Background()
+	//wg := &sync.WaitGroup{}
+	//wg.Add(1)
+
 	// parsing flags causes flag redefined errors
 	//cfg.ParseFlags()
-	suite.storage, _ = infile.InitStorage(cfg.StorageConfig)
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+	suite.wg = &sync.WaitGroup{}
+	suite.wg.Add(1)
+	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
 	suite.router = chi.NewRouter()
@@ -48,8 +61,7 @@ func TestHandlersTestSuite(t *testing.T) {
 }
 
 func (suite *HandlersTestSuite) TestHandleGetURL() {
-	ctx := context.Background()
-	sURL, _ := suite.shortenerService.Encode(ctx, "https://yandex.ru")
+	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://yandex.ru")
 	suite.router.Get("/{urlID}", suite.urlHandler.HandleGetURL())
 
 	// set tests' parameters
@@ -92,6 +104,8 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 		})
 	}
 	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
 }
 
 func (suite *HandlersTestSuite) TestHandlePostURL() {
@@ -142,6 +156,8 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 		})
 	}
 	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
 }
 
 func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
@@ -153,12 +169,12 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 	}
 	tests := []struct {
 		name string
-		URL  model.RequestURL
+		URL  modeldto.RequestURL
 		want want
 	}{
 		{
 			name: "Correct POST query",
-			URL: model.RequestURL{
+			URL: modeldto.RequestURL{
 				URL: "https://www.yandex.ru",
 			},
 			want: want{
@@ -167,7 +183,7 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 		},
 		{
 			name: "Invalid POST query (empty query)",
-			URL: model.RequestURL{
+			URL: modeldto.RequestURL{
 				URL: "",
 			},
 			want: want{
@@ -176,7 +192,7 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 		},
 		{
 			name: "Invalid POST query (not URL)",
-			URL: model.RequestURL{
+			URL: modeldto.RequestURL{
 				URL: "kke738enb734b",
 			},
 			want: want{
@@ -200,4 +216,6 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 		})
 	}
 	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
 }
