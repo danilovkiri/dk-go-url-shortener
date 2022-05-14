@@ -93,7 +93,10 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 		u.Path = id
-		w.Write([]byte(u.String()))
+		_, err = w.Write([]byte(u.String()))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 	}
 }
 
@@ -151,6 +154,9 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		// set and send response body
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		w.Write(resBody)
+		_, err = w.Write(resBody)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 	}
 }

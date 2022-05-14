@@ -76,7 +76,7 @@ func (c *Config) ParseFlags() {
 	b := flag.String("b", "http://localhost:8080", "Base url")
 	f := flag.String("f", "url_storage.json", "File storage path")
 	flag.Parse()
-	// priority: flag -> env -> default env
+	// priority: flag -> env -> default flag
 	// note that env parsing precedes flag parsing
 	if isFlagPassed("a") || c.ServerConfig.ServerAddress == "" {
 		c.ServerConfig.ServerAddress = *a

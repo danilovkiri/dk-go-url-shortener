@@ -38,11 +38,6 @@ func (suite *HandlersTestSuite) SetupTest() {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-
-	//ctx := context.Background()
-	//wg := &sync.WaitGroup{}
-	//wg.Add(1)
-
 	// parsing flags causes flag redefined errors
 	//cfg.ParseFlags()
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())

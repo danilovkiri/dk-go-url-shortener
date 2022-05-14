@@ -1,6 +1,7 @@
 package infile
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
@@ -13,31 +14,36 @@ import (
 
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
-	mu  sync.Mutex
-	Cfg *config.StorageConfig
-	DB  map[string]string
+	mu      sync.Mutex
+	Cfg     *config.StorageConfig
+	DB      map[string]string
+	Encoder *json.Encoder
 }
 
 // InitStorage initializes a Storage object, sets its attributes and starts a listener for persistStorage.
 func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
 	db := make(map[string]string)
 	st := Storage{
-		DB:  db,
 		Cfg: cfg,
+		DB:  db,
 	}
 	err := st.restore()
 	if err != nil {
 		return nil, err
 	}
-	// start a goroutine to listen for ctx cancellation followed by persistStorage call
+	// start a goroutine to open a file storage and set an Encoder object then
+	// listen for ctx cancellation followed by file storage closure,
 	// use sync.WaitGroup to prevent goroutine premature termination when main exits
 	go func() {
-		defer wg.Done()
-		<-ctx.Done()
-		err := st.persistStorage()
+		file, err := os.OpenFile(st.Cfg.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 		if err != nil {
 			log.Fatal(err)
 		}
+		defer file.Close()
+		defer wg.Done()
+		encoder := json.NewEncoder(file)
+		st.Encoder = encoder
+		<-ctx.Done()
 	}()
 	return &st, nil
 }
@@ -49,8 +55,8 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	retrieveError := make(chan string)
 	go func() {
 		s.mu.Lock()
+		defer s.mu.Unlock()
 		URL, ok := s.DB[sURL]
-		s.mu.Unlock()
 		if !ok {
 			retrieveError <- "not found in DB"
 			return
@@ -78,14 +84,19 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
 	dumpDone := make(chan bool)
 	dumpError := make(chan string)
 	go func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		_, ok := s.DB[sURL]
 		if ok {
 			dumpError <- "already exists in DB"
 			return
 		}
-		s.mu.Lock()
 		s.DB[sURL] = URL
-		s.mu.Unlock()
+		err := s.addToFileDB(sURL, URL)
+		if err != nil {
+			dumpError <- "could not add to file DB"
+			return
+		}
 		dumpDone <- true
 	}()
 
@@ -111,11 +122,14 @@ func (s *Storage) restore() error {
 		return err
 	}
 	defer file.Close()
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&storageEntries)
-	if err != nil {
-		// decoding an empty file results in EOF error
-		log.Println("Attempted to restore DB from empty file")
+	reader := bufio.NewScanner(file)
+	for reader.Scan() {
+		var storageEntry modelstorage.URLStorageEntry
+		err := json.Unmarshal(reader.Bytes(), &storageEntry)
+		if err != nil {
+			return err
+		}
+		storageEntries = append(storageEntries, storageEntry)
 	}
 	log.Print("DB was restored")
 	for _, entry := range storageEntries {
@@ -124,30 +138,16 @@ func (s *Storage) restore() error {
 	return nil
 }
 
-// persistStorage appends the tmpfs DB contents to a file storage.
-func (s *Storage) persistStorage() error {
-	if len(s.DB) == 0 {
-		log.Print("Empty DB to be saved")
-		return nil
+// addToFileDB adds one sURL:URL key-value pair to a file DB.
+func (s *Storage) addToFileDB(sURL, URL string) error {
+	rowToEncode := modelstorage.URLStorageEntry{
+		SURL: sURL,
+		URL:  URL,
 	}
-	file, err := os.OpenFile(s.Cfg.FileStoragePath, os.O_RDWR|os.O_CREATE, 0777)
+	err := s.Encoder.Encode(rowToEncode)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	encoder := json.NewEncoder(file)
-	var rows []modelstorage.URLStorageEntry
-	for sURL, URL := range s.DB {
-		rowToEncode := modelstorage.URLStorageEntry{
-			SURL: sURL,
-			URL:  URL,
-		}
-		rows = append(rows, rowToEncode)
-	}
-	err = encoder.Encode(rows)
-	if err != nil {
-		return err
-	}
-	log.Print("DB was saved")
+	log.Print("POST query was saved to DB")
 	return nil
 }
