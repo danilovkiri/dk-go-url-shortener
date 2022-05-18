@@ -32,14 +32,15 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	if err != nil {
 		return nil, err
 	}
-	// start a goroutine to open a file storage and set an Encoder object then
+	// open file outside of goroutine since this operation might not finish prior to encoding operations
+	file, err := os.OpenFile(st.Cfg.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// start a goroutine to set an Encoder object then
 	// listen for ctx cancellation followed by file storage closure,
 	// use sync.WaitGroup to prevent goroutine premature termination when main exits
 	go func() {
-		file, err := os.OpenFile(st.Cfg.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
-		if err != nil {
-			log.Fatal(err)
-		}
 		defer file.Close()
 		defer wg.Done()
 		encoder := json.NewEncoder(file)

@@ -80,7 +80,7 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 		}
 		log.Println("POST request detected for", string(b))
 		// encode URL into sURL and store
-		id, err := h.processor.Encode(ctx, string(b), userID)
+		sURL, err := h.processor.Encode(ctx, string(b), userID)
 		if err != nil {
 			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 				log.Println("HandlePostURL:", err)
@@ -91,14 +91,14 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			}
 			return
 		}
-		log.Println("HandlePostURL: stored", string(b), "as", id)
+		log.Println("HandlePostURL: stored", string(b), "as", sURL)
 		// set and send response
 		w.WriteHeader(http.StatusCreated)
 		u, err := url.Parse(h.serverConfig.BaseURL)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
-		u.Path = id
+		u.Path = sURL
 		_, err = w.Write([]byte(u.String()))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -130,11 +130,16 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 			http.Error(w, "", http.StatusNoContent)
 			return
 		}
-		// // create and serialize response object into JSON
+		// create and serialize response object into JSON
+		u, err := url.Parse(h.serverConfig.BaseURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
 		for _, fullURL := range URLs {
+			u.Path = fullURL.SURL
 			responseURL := modeldto.ResponseFullURL{
 				URL:  fullURL.URL,
-				SURL: fullURL.SURL,
+				SURL: u.String(),
 			}
 			responseURLs = append(responseURLs, responseURL)
 		}
