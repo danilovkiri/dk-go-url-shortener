@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
 	"log"
@@ -16,13 +17,13 @@ import (
 type Storage struct {
 	mu      sync.Mutex
 	Cfg     *config.StorageConfig
-	DB      map[string]string
+	DB      map[string]modelstorage.URLMapEntry
 	Encoder *json.Encoder
 }
 
 // InitStorage initializes a Storage object, sets its attributes and starts a listener for persistStorage.
 func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
-	db := make(map[string]string)
+	db := make(map[string]modelstorage.URLMapEntry)
 	st := Storage{
 		Cfg: cfg,
 		DB:  db,
@@ -56,12 +57,12 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		URL, ok := s.DB[sURL]
+		URLMapEntry, ok := s.DB[sURL]
 		if !ok {
 			retrieveError <- "not found in DB"
 			return
 		}
-		retrieveDone <- URL
+		retrieveDone <- URLMapEntry.URL
 	}()
 
 	// wait for the first channel to retrieve a value
@@ -78,8 +79,39 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	}
 }
 
+// RetrieveByUserID returns a slice of URL:sURL pairs defined as modelurl.FullURL for one particular user ID.
+func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error) {
+	// create channels for listening to the go routine result
+	retrieveDone := make(chan []modelurl.FullURL)
+	go func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		var URLs []modelurl.FullURL
+		for sURL, URL := range s.DB {
+			if URL.UserID == userID {
+				fullURL := modelurl.FullURL{
+					URL:  URL.URL,
+					SURL: sURL,
+				}
+				URLs = append(URLs, fullURL)
+			}
+		}
+		retrieveDone <- URLs
+	}()
+
+	// wait for the first channel to retrieve a value
+	select {
+	case <-ctx.Done():
+		log.Println("Retrieving URLs by UserID:", ctx.Err())
+		return nil, errors.ContextTimeoutExceededError{}
+	case URLs := <-retrieveDone:
+		log.Println("Retrieving URL by UserID:", URLs)
+		return URLs, nil
+	}
+}
+
 // Dump stores a pair of sURL and URL as a key-value pair in a map.
-func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
+func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID string) error {
 	// create channels for listening to the go routine result
 	dumpDone := make(chan bool)
 	dumpError := make(chan string)
@@ -91,8 +123,8 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string) error {
 			dumpError <- "already exists in DB"
 			return
 		}
-		s.DB[sURL] = URL
-		err := s.addToFileDB(sURL, URL)
+		s.DB[sURL] = modelstorage.URLMapEntry{URL: URL, UserID: userID}
+		err := s.addToFileDB(sURL, URL, userID)
 		if err != nil {
 			dumpError <- "could not add to file DB"
 			return
@@ -133,16 +165,17 @@ func (s *Storage) restore() error {
 	}
 	log.Print("DB was restored")
 	for _, entry := range storageEntries {
-		s.DB[entry.SURL] = entry.URL
+		s.DB[entry.SURL] = modelstorage.URLMapEntry{URL: entry.URL, UserID: entry.UserID}
 	}
 	return nil
 }
 
 // addToFileDB adds one sURL:URL key-value pair to a file DB.
-func (s *Storage) addToFileDB(sURL, URL string) error {
+func (s *Storage) addToFileDB(sURL, URL, userID string) error {
 	rowToEncode := modelstorage.URLStorageEntry{
-		SURL: sURL,
-		URL:  URL,
+		SURL:   sURL,
+		URL:    URL,
+		UserID: userID,
 	}
 	err := s.Encoder.Encode(rowToEncode)
 	if err != nil {

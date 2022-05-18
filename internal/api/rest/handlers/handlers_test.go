@@ -3,14 +3,17 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"net/http"
@@ -25,6 +28,7 @@ type HandlersTestSuite struct {
 	storage          storage.URLStorage
 	shortenerService shortenerService.Processor
 	urlHandler       *URLHandler
+	cookieHandler    *middleware.CookieHandler
 	router           *chi.Mux
 	ts               *httptest.Server
 	ctx              context.Context
@@ -46,6 +50,8 @@ func (suite *HandlersTestSuite) SetupTest() {
 	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	suite.cookieHandler, _ = middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
 }
@@ -56,7 +62,8 @@ func TestHandlersTestSuite(t *testing.T) {
 }
 
 func (suite *HandlersTestSuite) TestHandleGetURL() {
-	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://yandex.ru")
+	userID := uuid.New().String()
+	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://yandex.ru", userID)
 	suite.router.Get("/{urlID}", suite.urlHandler.HandleGetURL())
 
 	// set tests' parameters
@@ -104,6 +111,7 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 }
 
 func (suite *HandlersTestSuite) TestHandlePostURL() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
 	suite.router.Post("/", suite.urlHandler.HandlePostURL())
 
 	// set tests' parameters
@@ -156,6 +164,7 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 }
 
 func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
 	suite.router.Post("/api/shorten", suite.urlHandler.JSONHandlePostURL())
 
 	// set tests' parameters

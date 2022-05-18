@@ -7,6 +7,11 @@ type (
 	}
 
 	ResponseURL struct {
-		ShortURL string `json:"result"`
+		SURL string `json:"result"`
+	}
+
+	ResponseFullURL struct {
+		URL  string `json:"original_url"`
+		SURL string `json:"short_url"`
 	}
 )

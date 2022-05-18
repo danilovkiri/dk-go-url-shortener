@@ -11,6 +11,9 @@ type (
 	ServiceFoundNilStorage struct {
 		Msg string
 	}
+	ServiceFoundNilSecretary struct {
+		Msg string
+	}
 	ServiceIncorrectInputURL struct {
 		Msg string
 	}
@@ -25,6 +28,10 @@ func (e *ServiceEncodingHashError) Error() string {
 }
 
 func (e *ServiceFoundNilStorage) Error() string {
+	return e.Msg
+}
+
+func (e *ServiceFoundNilSecretary) Error() string {
 	return e.Msg
 }
 

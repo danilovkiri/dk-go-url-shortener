@@ -3,9 +3,11 @@ package handlers
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
@@ -47,10 +49,9 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 				log.Println("HandleGetURL:", err)
 				w.WriteHeader(http.StatusGatewayTimeout)
-			} else {
-				log.Println("HandleGetURL:", err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
+			log.Println("HandleGetURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		log.Println("HandleGetURL: retrieved URL", URL)
@@ -72,9 +73,14 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		userID, err := getUserID(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		log.Println("POST request detected for", string(b))
 		// encode URL into sURL and store
-		id, err := h.processor.Encode(ctx, string(b))
+		id, err := h.processor.Encode(ctx, string(b), userID)
 		if err != nil {
 			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 				log.Println("HandlePostURL:", err)
@@ -94,6 +100,52 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 		}
 		u.Path = id
 		_, err = w.Write([]byte(u.String()))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+}
+
+// HandleGetURLsByUserID provides client with a json of all sURL:URL pairs it has ever processed from that client.
+func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// set context timeout to 500 ms for timing DB operations
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+		var responseURLs []modeldto.ResponseFullURL
+		// retrieve user identifier
+		userID, err := getUserID(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// retrieve all pairs of sURL:URL for that particular user
+		URLs, err := h.processor.DecodeByUserID(ctx, userID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// response with HTTP code 204 if no content was found for that user
+		if len(URLs) == 0 {
+			http.Error(w, "", http.StatusNoContent)
+			return
+		}
+		// // create and serialize response object into JSON
+		for _, fullURL := range URLs {
+			responseURL := modeldto.ResponseFullURL{
+				URL:  fullURL.URL,
+				SURL: fullURL.SURL,
+			}
+			responseURLs = append(responseURLs, responseURL)
+		}
+		resBody, err := json.Marshal(responseURLs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// set and send response body
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write(resBody)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
@@ -123,9 +175,14 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		userID, err := getUserID(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		log.Println("JSON POST request detected for", post.URL)
 		// encode URL into sURL and store them
-		id, err := h.processor.Encode(ctx, post.URL)
+		id, err := h.processor.Encode(ctx, post.URL, userID)
 		if err != nil {
 			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 				log.Println("JSONHandlePostURL:", err)
@@ -144,7 +201,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		}
 		u.Path = id
 		resData := modeldto.ResponseURL{
-			ShortURL: u.String(),
+			SURL: u.String(),
 		}
 		resBody, err := json.Marshal(resData)
 		if err != nil {
@@ -159,4 +216,20 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}
+}
+
+// getUserID retrieves user identifier as a value of cookie with key middleware.UserCookieKey.
+func getUserID(r *http.Request) (string, error) {
+	userCookie, err := r.Cookie(middleware.UserCookieKey)
+	if err != nil {
+		return "", err
+	}
+	token := userCookie.Value
+	data, err := hex.DecodeString(token)
+	if err != nil {
+		return "", err
+	}
+	userID := data
+	log.Println("userID", hex.EncodeToString(userID))
+	return hex.EncodeToString(userID), nil
 }

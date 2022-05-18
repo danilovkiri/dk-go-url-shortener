@@ -10,6 +10,7 @@ import (
 type Config struct {
 	ServerConfig  *ServerConfig
 	StorageConfig *StorageConfig
+	SecretConfig  *SecretConfig
 }
 
 // ServerConfig defines default server-relates constants and parameters and overwrites them with environment variables.
@@ -21,6 +22,11 @@ type ServerConfig struct {
 // StorageConfig retrieves file storage-related parameters from environment.
 type StorageConfig struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+}
+
+// SecretConfig retrieves a secret user key for hashing.
+type SecretConfig struct {
+	UserKey string `env:"USER_KEY" envDefault:"jds__63h3_7ds"`
 }
 
 // NewStorageConfig sets up a storage configuration.
@@ -43,6 +49,16 @@ func NewServerConfig() (*ServerConfig, error) {
 	return &cfg, nil
 }
 
+// NewSecretConfig sets up a secret configuration.
+func NewSecretConfig() (*SecretConfig, error) {
+	cfg := SecretConfig{}
+	err := env.Parse(&cfg)
+	if err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
 // NewDefaultConfiguration sets up a total configuration.
 func NewDefaultConfiguration() (*Config, error) {
 	serverCfg, err := NewServerConfig()
@@ -53,9 +69,14 @@ func NewDefaultConfiguration() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	secretConfig, err := NewSecretConfig()
+	if err != nil {
+		return nil, err
+	}
 	return &Config{
 		ServerConfig:  serverCfg,
 		StorageConfig: storageCfg,
+		SecretConfig:  secretConfig,
 	}, nil
 }
 

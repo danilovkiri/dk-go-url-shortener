@@ -1,4 +1,4 @@
-// Package middleware provides response compressing functionality.
+// Package middleware provides various middleware functionality.
 package middleware
 
 import (

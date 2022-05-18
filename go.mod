@@ -4,8 +4,9 @@ go 1.17
 
 require (
 	github.com/caarlos0/env/v6 v6.9.1
-	github.com/go-chi/chi v1.5.4
+	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-resty/resty/v2 v2.7.0
+	github.com/google/uuid v1.3.0
 	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/stretchr/testify v1.7.1
 )

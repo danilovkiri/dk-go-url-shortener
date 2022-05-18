@@ -6,6 +6,7 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
 	"github.com/go-chi/chi"
@@ -23,11 +24,21 @@ func InitServer(ctx context.Context, cfg *config.Config, storage *infile.Storage
 	if err != nil {
 		return nil, err
 	}
+	secretaryService, err := secretary.NewSecretaryService(cfg.SecretConfig)
+	if err != nil {
+		return nil, err
+	}
+	cookieHandler, err := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	if err != nil {
+		return nil, err
+	}
 	r := chi.NewRouter()
+	r.Use(cookieHandler.CookieHandle)
 	r.Use(middleware.CompressHandle)
 	r.Use(middleware.DecompressHandle)
 	r.Post("/", urlHandler.HandlePostURL())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
+	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
