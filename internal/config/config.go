@@ -22,6 +22,7 @@ type ServerConfig struct {
 // StorageConfig retrieves file storage-related parameters from environment.
 type StorageConfig struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	DatabaseDSN     string `env:"DATABASE_DSN"`
 }
 
 // SecretConfig retrieves a secret user key for hashing.
@@ -96,6 +97,7 @@ func (c *Config) ParseFlags() {
 	a := flag.String("a", ":8080", "Server address")
 	b := flag.String("b", "http://localhost:8080", "Base url")
 	f := flag.String("f", "url_storage.json", "File storage path")
+	d := flag.String("d", "postgres://ya:url@localhost:5432", "PSQL DB connection")
 	flag.Parse()
 	// priority: flag -> env -> default flag
 	// note that env parsing precedes flag parsing
@@ -107,5 +109,8 @@ func (c *Config) ParseFlags() {
 	}
 	if isFlagPassed("f") || c.StorageConfig.FileStoragePath == "" {
 		c.StorageConfig.FileStoragePath = *f
+	}
+	if isFlagPassed("d") || c.StorageConfig.DatabaseDSN == "" {
+		c.StorageConfig.DatabaseDSN = *d
 	}
 }

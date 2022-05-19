@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/inpsql"
 	"log"
 	"net/http"
 	"os"
@@ -28,7 +28,7 @@ func main() {
 	}
 	cfg.ParseFlags()
 	// initialize (or retrieve if present) storage
-	storage, err := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	storage, err := inpsql.InitStorage(ctx, wg, cfg.StorageConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

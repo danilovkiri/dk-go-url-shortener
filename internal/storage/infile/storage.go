@@ -50,7 +50,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	return &st, nil
 }
 
-// Retrieve returns a URL as a value of a map based on the given sURL as a key of a map.
+// Retrieve returns a URL corresponding to sURL.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan string)
@@ -111,7 +111,7 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	}
 }
 
-// Dump stores a pair of sURL and URL as a key-value pair in a map.
+// Dump stores a pair of sURL and URL as a key-value pair.
 func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID string) error {
 	// create channels for listening to the go routine result
 	dumpDone := make(chan bool)
@@ -183,5 +183,15 @@ func (s *Storage) addToFileDB(sURL, URL, userID string) error {
 		return err
 	}
 	log.Print("POST query was saved to DB")
+	return nil
+}
+
+// PingDB is a mock for PSQL DB pinger for infile DB handling.
+func (s *Storage) PingDB() error {
+	return nil
+}
+
+// CloseDB is a mock for PSQL DB closer for infile DB handling.
+func (s *Storage) CloseDB() error {
 	return nil
 }

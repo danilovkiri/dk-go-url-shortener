@@ -8,14 +8,14 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/inpsql"
 	"github.com/go-chi/chi"
 	"net/http"
 	"time"
 )
 
 // InitServer returns a http.Server object ready to be listening and serving .
-func InitServer(ctx context.Context, cfg *config.Config, storage *infile.Storage) (server *http.Server, err error) {
+func InitServer(ctx context.Context, cfg *config.Config, storage *inpsql.Storage) (server *http.Server, err error) {
 	shortenerService, err := shortener.InitShortener(storage)
 	if err != nil {
 		return nil, err
@@ -37,9 +37,10 @@ func InitServer(ctx context.Context, cfg *config.Config, storage *infile.Storage
 	r.Use(middleware.CompressHandle)
 	r.Use(middleware.DecompressHandle)
 	r.Post("/", urlHandler.HandlePostURL())
+	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
-	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
+	r.Get("/ping", urlHandler.HandlePingDB())
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
 		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),

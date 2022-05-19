@@ -21,9 +21,21 @@ type URLGetterByUserID interface {
 	RetrieveByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error)
 }
 
+// Pinger defines a set of methods for types implementing Pinger.
+type Pinger interface {
+	PingDB() error
+}
+
+// Closer defines a set of methods for types implementing Closer.
+type Closer interface {
+	CloseDB() error
+}
+
 // URLStorage defines a set of embedded interfaces for types implementing URLStorage.
 type URLStorage interface {
 	URLSetter
 	URLGetter
 	URLGetterByUserID
+	Pinger
+	Closer
 }

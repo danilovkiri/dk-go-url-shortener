@@ -106,3 +106,13 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL, userID string) err
 		return nil
 	}
 }
+
+// PingDB is a mock for PSQL DB pinger for inmemory DB handling.
+func (s *Storage) PingDB() error {
+	return nil
+}
+
+// CloseDB is a mock for PSQL DB closer for inmemory DB handling.
+func (s *Storage) CloseDB() error {
+	return nil
+}

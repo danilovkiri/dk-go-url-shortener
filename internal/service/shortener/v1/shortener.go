@@ -79,6 +79,11 @@ func (short *Shortener) DecodeByUserID(ctx context.Context, userID string) (URLs
 	return URLs, nil
 }
 
+func (short *Shortener) PingDB() error {
+	err := short.URLStorage.PingDB()
+	return err
+}
+
 // generateSlug generates and returns a short unique identifier for a string.
 func (short *Shortener) generateSlug() (slug string, err error) {
 	now := time.Now().UnixNano()

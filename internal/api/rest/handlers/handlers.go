@@ -223,6 +223,17 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 	}
 }
 
+// HandlePingDB handles PSQL DB pinging to check connection status.
+func (h *URLHandler) HandlePingDB() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := h.processor.PingDB()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 // getUserID retrieves user identifier as a value of cookie with key middleware.UserCookieKey.
 func getUserID(r *http.Request) (string, error) {
 	userCookie, err := r.Cookie(middleware.UserCookieKey)

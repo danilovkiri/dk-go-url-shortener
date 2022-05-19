@@ -11,4 +11,5 @@ type Processor interface {
 	Encode(ctx context.Context, URL, userID string) (sURL string, err error)
 	Decode(ctx context.Context, sURL string) (URL string, err error)
 	DecodeByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error)
+	PingDB() error
 }
