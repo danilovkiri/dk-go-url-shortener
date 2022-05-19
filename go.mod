@@ -8,6 +8,7 @@ require (
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/google/uuid v1.3.0
 	github.com/jackc/pgx/v4 v4.16.1
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/stretchr/testify v1.7.1
 )

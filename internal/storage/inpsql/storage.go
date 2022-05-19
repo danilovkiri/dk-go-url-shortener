@@ -2,10 +2,10 @@ package inpsql
 
 import (
 	"context"
-	"database/sql"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	_ "github.com/jackc/pgx/v4"
+	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jmoiron/sqlx"
 	"log"
 	"sync"
 )
@@ -14,12 +14,12 @@ import (
 type Storage struct {
 	mu  sync.Mutex
 	Cfg *config.StorageConfig
-	DB  *sql.DB
+	DB  *sqlx.DB
 }
 
 // InitStorage initializes a Storage object, sets its attributes and starts a listener for persistStorage.
 func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
-	db, err := sql.Open("postgres", cfg.DatabaseDSN)
+	db, err := sqlx.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,9 +32,13 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 		log.Fatal(err)
 	}
 	go func() {
-		defer st.DB.Close()
 		defer wg.Done()
 		<-ctx.Done()
+		err := st.DB.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println("PSQL DB connection closed successfully")
 	}()
 	return &st, nil
 }
@@ -69,7 +73,7 @@ func (s *Storage) createTable() error {
 	query := `CREATE TABLE IF NOT EXISTS urls (
 		id bigserial not null,
 		user_id uuid not null,
-		url text not null unique,
+		url text not null,
 		short_url text not null unique 
 	);`
 	_, err := s.DB.Exec(query)

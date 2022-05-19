@@ -48,7 +48,6 @@ func main() {
 		if err := server.Shutdown(ctxTO); err != nil {
 			log.Fatal("Server shutdown failed:", err)
 		}
-		log.Print("Server shutdown succeeded")
 		cancel()
 	}()
 	// start up the server
@@ -58,4 +57,5 @@ func main() {
 	}
 	// wait for goroutine in InitStorage to finish before exiting
 	wg.Wait()
+	log.Print("Server shutdown succeeded")
 }
