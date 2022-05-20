@@ -98,7 +98,7 @@ func (c *Config) ParseFlags() {
 	b := flag.String("b", "http://localhost:8080", "Base url")
 	f := flag.String("f", "url_storage.json", "File storage path")
 	// DatabaseDSN scheme: "postgres://username:password@localhost:5432/database_name"
-	d := flag.String("d", "postgres://kirilldanilov:12345@localhost:5432/urlshort", "PSQL DB connection")
+	d := flag.String("d", "", "PSQL DB connection")
 	flag.Parse()
 	// priority: flag -> env -> default flag
 	// note that env parsing precedes flag parsing

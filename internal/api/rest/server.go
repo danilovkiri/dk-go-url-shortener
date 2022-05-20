@@ -8,14 +8,14 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/inpsql"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
 	"github.com/go-chi/chi"
 	"net/http"
 	"time"
 )
 
 // InitServer returns a http.Server object ready to be listening and serving .
-func InitServer(ctx context.Context, cfg *config.Config, storage *inpsql.Storage) (server *http.Server, err error) {
+func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStorage) (server *http.Server, err error) {
 	shortenerService, err := shortener.InitShortener(storage)
 	if err != nil {
 		return nil, err

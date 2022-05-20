@@ -13,6 +13,8 @@ import (
 	"sync"
 )
 
+//var _ storage.URLStorage = (*Storage)(nil)
+
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
 	mu      sync.Mutex
@@ -21,7 +23,7 @@ type Storage struct {
 	Encoder *json.Encoder
 }
 
-// InitStorage initializes a Storage object, sets its attributes and starts a listener for persistStorage.
+// InitStorage initializes a Storage object and sets its attributes.
 func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
 	db := make(map[string]modelstorage.URLMapEntry)
 	st := Storage{
