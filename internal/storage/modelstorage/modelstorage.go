@@ -11,3 +11,10 @@ type URLMapEntry struct {
 	URL    string
 	UserID string
 }
+
+type URLPostgresEntry struct {
+	ID     uint   `db:"id"`
+	UserID string `db:"user_id"` // store as a string since we store encoded tokens
+	URL    string `db:"url"`
+	SURL   string `db:"short_url"`
+}

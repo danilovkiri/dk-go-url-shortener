@@ -85,10 +85,9 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 				log.Println("HandlePostURL:", err)
 				w.WriteHeader(http.StatusGatewayTimeout)
-			} else {
-				log.Println("HandlePostURL:", err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
+			log.Println("HandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		log.Println("HandlePostURL: stored", string(b), "as", sURL)
@@ -122,6 +121,10 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 		// retrieve all pairs of sURL:URL for that particular user
 		URLs, err := h.processor.DecodeByUserID(ctx, userID)
 		if err != nil {
+			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
+				log.Println("HandleGetURLsByUserID:", err)
+				w.WriteHeader(http.StatusGatewayTimeout)
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -192,10 +195,9 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 				log.Println("JSONHandlePostURL:", err)
 				w.WriteHeader(http.StatusGatewayTimeout)
-			} else {
-				log.Println("JSONHandlePostURL:", err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
 			}
+			log.Println("JSONHandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		log.Println("JSONHandlePostURL: stored", post.URL, "as", id)

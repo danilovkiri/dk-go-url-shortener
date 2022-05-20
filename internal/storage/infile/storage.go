@@ -41,11 +41,15 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	// listen for ctx cancellation followed by file storage closure,
 	// use sync.WaitGroup to prevent goroutine premature termination when main exits
 	go func() {
-		defer file.Close()
 		defer wg.Done()
 		encoder := json.NewEncoder(file)
 		st.Encoder = encoder
 		<-ctx.Done()
+		err := file.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println("File storage closed successfully")
 	}()
 	return &st, nil
 }
