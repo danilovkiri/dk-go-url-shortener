@@ -2,28 +2,26 @@ package inpsql
 
 import (
 	"context"
+	"database/sql"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
 	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/jmoiron/sqlx"
 	"log"
 	"sync"
 )
-
-//var _ storage.URLStorage = (*Storage)(nil)
 
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
 	mu  sync.Mutex
 	Cfg *config.StorageConfig
-	DB  *sqlx.DB
+	DB  *sql.DB
 }
 
 // InitStorage initializes a Storage object and sets its attributes.
 func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
-	db, err := sqlx.Open("pgx", cfg.DatabaseDSN)
+	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,7 +29,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 		Cfg: cfg,
 		DB:  db,
 	}
-	err = st.createTable()
+	err = st.createTable(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,8 +54,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		// use GetContext due to one variable usage as an output
-		err = s.DB.GetContext(ctx, &URL, query, sURL)
+		err := s.DB.QueryRowContext(ctx, query, sURL).Scan(&URL)
 		if err != nil {
 			retrieveError <- "PSQL error"
 			return
@@ -95,13 +92,24 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		var queryOutput []modelstorage.URLPostgresEntry
-		// use SelectContext due to struct usage and slices
-		err := s.DB.SelectContext(ctx, &queryOutput, query, userID)
+		rows, err := s.DB.QueryContext(ctx, query, userID)
+		defer rows.Close()
 		if err != nil {
 			retrieveError <- "PSQL error"
 			return
 		}
+		// extract DB row data into corresponding go structure
+		var queryOutput []modelstorage.URLPostgresEntry
+		for rows.Next() {
+			var queryOutputRow modelstorage.URLPostgresEntry
+			err = rows.Scan(&queryOutputRow.ID, &queryOutputRow.UserID, &queryOutputRow.URL, &queryOutputRow.SURL)
+			if err != nil {
+				retrieveError <- "PSQL error"
+				return
+			}
+			queryOutput = append(queryOutput, queryOutputRow)
+		}
+		// extract go structure data into necessary output structure
 		var URLs []modelurl.FullURL
 		for _, entry := range queryOutput {
 			fullURL := modelurl.FullURL{
@@ -112,7 +120,6 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 		}
 		retrieveDone <- URLs
 	}()
-
 	// wait for the first channel to retrieve a value
 	select {
 	case <-ctx.Done():
@@ -168,7 +175,7 @@ func (s *Storage) CloseDB() error {
 }
 
 // createTable creates a table for PSQL DB storage if not exist.
-func (s *Storage) createTable() error {
+func (s *Storage) createTable(ctx context.Context) error {
 	// store user_id as text since we store encoded tokens
 	query := `CREATE TABLE IF NOT EXISTS urls (
 		id bigserial not null,
@@ -176,6 +183,6 @@ func (s *Storage) createTable() error {
 		url text not null,
 		short_url text not null unique 
 	);`
-	_, err := s.DB.Exec(query)
+	_, err := s.DB.ExecContext(ctx, query)
 	return err
 }

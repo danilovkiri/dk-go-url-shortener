@@ -1,73 +1,70 @@
-package infile
+package inpsql_sqlx
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
+	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jmoiron/sqlx"
 	"log"
-	"os"
 	"sync"
 )
 
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
-	mu      sync.Mutex
-	Cfg     *config.StorageConfig
-	DB      map[string]modelstorage.URLMapEntry
-	Encoder *json.Encoder
+	mu  sync.Mutex
+	Cfg *config.StorageConfig
+	DB  *sqlx.DB
 }
 
 // InitStorage initializes a Storage object and sets its attributes.
 func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
-	db := make(map[string]modelstorage.URLMapEntry)
+	db, err := sqlx.Open("pgx", cfg.DatabaseDSN)
+	if err != nil {
+		log.Fatal(err)
+	}
 	st := Storage{
 		Cfg: cfg,
 		DB:  db,
 	}
-	err := st.restore()
-	if err != nil {
-		return nil, err
-	}
-	// open file outside of goroutine since this operation might not finish prior to encoding operations
-	file, err := os.OpenFile(st.Cfg.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
+	err = st.createTable(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// start a goroutine to set an Encoder object then
-	// listen for ctx cancellation followed by file storage closure,
-	// use sync.WaitGroup to prevent goroutine premature termination when main exits
 	go func() {
 		defer wg.Done()
-		encoder := json.NewEncoder(file)
-		st.Encoder = encoder
 		<-ctx.Done()
-		err := file.Close()
+		err := st.DB.Close()
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Println("File storage closed successfully")
+		log.Println("PSQL DB connection closed successfully")
 	}()
 	return &st, nil
 }
 
-// Retrieve returns a URL corresponding to sURL.
+// Retrieve returns a URL as a value of a map based on the given sURL as a key of a map.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
+	query := "SELECT url FROM urls WHERE short_url = $1"
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan string)
 	retrieveError := make(chan string)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		URLMapEntry, ok := s.DB[sURL]
-		if !ok {
+		// use GetContext due to one variable usage as an output
+		err = s.DB.GetContext(ctx, &URL, query, sURL)
+		if err != nil {
+			retrieveError <- "PSQL error"
+			return
+		}
+		if len(URL) == 0 {
 			retrieveError <- "not found in DB"
 			return
 		}
-		retrieveDone <- URLMapEntry.URL
+		retrieveDone <- URL
 	}()
 
 	// wait for the first channel to retrieve a value
@@ -77,6 +74,9 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 		return "", errors.ContextTimeoutExceededError{}
 	case errString := <-retrieveError:
 		log.Println("Retrieving URL:", errString)
+		if errString == "PSQL error" {
+			return "", errors.StoragePSQLError{}
+		}
 		return "", errors.StorageNotFoundError{ID: sURL}
 	case URL := <-retrieveDone:
 		log.Println("Retrieving URL:", sURL, "as", URL)
@@ -86,20 +86,27 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 
 // RetrieveByUserID returns a slice of URL:sURL pairs defined as modelurl.FullURL for one particular user ID.
 func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error) {
+	query := "SELECT * FROM urls WHERE user_id = $1"
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan []modelurl.FullURL)
+	retrieveError := make(chan string)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		var queryOutput []modelstorage.URLPostgresEntry
+		// use SelectContext due to struct usage and slices
+		err := s.DB.SelectContext(ctx, &queryOutput, query, userID)
+		if err != nil {
+			retrieveError <- "PSQL error"
+			return
+		}
 		var URLs []modelurl.FullURL
-		for sURL, URL := range s.DB {
-			if URL.UserID == userID {
-				fullURL := modelurl.FullURL{
-					URL:  URL.URL,
-					SURL: sURL,
-				}
-				URLs = append(URLs, fullURL)
+		for _, entry := range queryOutput {
+			fullURL := modelurl.FullURL{
+				URL:  entry.URL,
+				SURL: entry.SURL,
 			}
+			URLs = append(URLs, fullURL)
 		}
 		retrieveDone <- URLs
 	}()
@@ -107,32 +114,29 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	// wait for the first channel to retrieve a value
 	select {
 	case <-ctx.Done():
-		log.Println("Retrieving URLs by UserID:", ctx.Err())
+		log.Println("Retrieving URLs by user ID:", ctx.Err())
 		return nil, errors.ContextTimeoutExceededError{}
+	case errString := <-retrieveError:
+		log.Println("Retrieving URLs by user ID:", errString)
+		return nil, errors.StoragePSQLError{}
 	case URLs := <-retrieveDone:
-		log.Println("Retrieving URL by UserID:", URLs)
+		log.Println("Retrieving URLs by user ID:", URLs)
 		return URLs, nil
 	}
 }
 
-// Dump stores a pair of sURL and URL as a key-value pair.
+// Dump stores a pair of sURL and URL as a key-value pair in a map.
 func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID string) error {
+	query := "INSERT INTO urls (user_id, url, short_url) VALUES ($1, $2, $3)"
 	// create channels for listening to the go routine result
 	dumpDone := make(chan bool)
 	dumpError := make(chan string)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		_, ok := s.DB[sURL]
-		if ok {
-			dumpError <- "already exists in DB"
-			return
-		}
-		s.DB[sURL] = modelstorage.URLMapEntry{URL: URL, UserID: userID}
-		err := s.addToFileDB(sURL, URL, userID)
+		_, err := s.DB.ExecContext(ctx, query, userID, URL, sURL)
 		if err != nil {
-			dumpError <- "could not add to file DB"
-			return
+			dumpError <- "PSQL error"
 		}
 		dumpDone <- true
 	}()
@@ -144,58 +148,32 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 		return errors.ContextTimeoutExceededError{}
 	case errString := <-dumpError:
 		log.Println("Dumping URL:", errString)
-		return errors.StorageAlreadyExistsError{ID: sURL}
+		return errors.StoragePSQLError{}
 	case <-dumpDone:
 		log.Println("Dumping URL:", sURL, "as", URL)
 		return nil
 	}
 }
 
-// restore fills the tmpfs DB with URL-sURL entries from file storage.
-func (s *Storage) restore() error {
-	var storageEntries []modelstorage.URLStorageEntry
-	file, err := os.OpenFile(s.Cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0777)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	reader := bufio.NewScanner(file)
-	for reader.Scan() {
-		var storageEntry modelstorage.URLStorageEntry
-		err := json.Unmarshal(reader.Bytes(), &storageEntry)
-		if err != nil {
-			return err
-		}
-		storageEntries = append(storageEntries, storageEntry)
-	}
-	log.Print("DB was restored")
-	for _, entry := range storageEntries {
-		s.DB[entry.SURL] = modelstorage.URLMapEntry{URL: entry.URL, UserID: entry.UserID}
-	}
-	return nil
-}
-
-// addToFileDB adds one sURL:URL key-value pair to a file DB.
-func (s *Storage) addToFileDB(sURL, URL, userID string) error {
-	rowToEncode := modelstorage.URLStorageEntry{
-		SURL:   sURL,
-		URL:    URL,
-		UserID: userID,
-	}
-	err := s.Encoder.Encode(rowToEncode)
-	if err != nil {
-		return err
-	}
-	log.Print("POST query was saved to DB")
-	return nil
-}
-
 // PingDB is a mock for PSQL DB pinger for infile DB handling.
 func (s *Storage) PingDB() error {
-	return nil
+	return s.DB.Ping()
 }
 
 // CloseDB is a mock for PSQL DB closer for infile DB handling.
 func (s *Storage) CloseDB() error {
-	return nil
+	return s.DB.Close()
+}
+
+// createTable creates a table for PSQL DB storage if not exist.
+func (s *Storage) createTable(ctx context.Context) error {
+	// store user_id as text since we store encoded tokens
+	query := `CREATE TABLE IF NOT EXISTS urls (
+		id bigserial not null,
+		user_id text not null,
+		url text not null,
+		short_url text not null unique 
+	);`
+	_, err := s.DB.ExecContext(ctx, query)
+	return err
 }
