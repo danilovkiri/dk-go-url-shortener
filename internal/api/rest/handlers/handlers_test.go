@@ -29,6 +29,7 @@ type HandlersTestSuite struct {
 	shortenerService shortenerService.Processor
 	urlHandler       *URLHandler
 	cookieHandler    *middleware.CookieHandler
+	secretaryService *secretary.Secretary
 	router           *chi.Mux
 	ts               *httptest.Server
 	ctx              context.Context
@@ -50,8 +51,8 @@ func (suite *HandlersTestSuite) SetupTest() {
 	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	suite.cookieHandler, _ = middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	suite.secretaryService, _ = secretary.NewSecretaryService(cfg.SecretConfig)
+	suite.cookieHandler, _ = middleware.NewCookieHandler(suite.secretaryService, cfg.SecretConfig)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
 }
@@ -62,8 +63,8 @@ func TestHandlersTestSuite(t *testing.T) {
 }
 
 func (suite *HandlersTestSuite) TestHandleGetURL() {
-	userID := uuid.New().String()
-	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://yandex.ru", userID)
+	userID := suite.secretaryService.Encode(uuid.New().String())
+	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://www.yandex.ru", userID)
 	suite.router.Get("/{urlID}", suite.urlHandler.HandleGetURL())
 
 	// set tests' parameters

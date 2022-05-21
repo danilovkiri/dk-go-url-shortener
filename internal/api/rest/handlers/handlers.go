@@ -248,6 +248,5 @@ func getUserID(r *http.Request) (string, error) {
 		return "", err
 	}
 	userID := data
-	log.Println("userID", hex.EncodeToString(userID))
 	return hex.EncodeToString(userID), nil
 }

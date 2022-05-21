@@ -58,13 +58,13 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan string)
-	retrieveError := make(chan string)
+	retrieveError := make(chan error)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		URLMapEntry, ok := s.DB[sURL]
 		if !ok {
-			retrieveError <- "not found in DB"
+			retrieveError <- errors.StorageNotFoundError{ID: sURL}
 			return
 		}
 		retrieveDone <- URLMapEntry.URL
@@ -75,9 +75,9 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	case <-ctx.Done():
 		log.Println("Retrieving URL:", ctx.Err())
 		return "", errors.ContextTimeoutExceededError{}
-	case errString := <-retrieveError:
-		log.Println("Retrieving URL:", errString)
-		return "", errors.StorageNotFoundError{ID: sURL}
+	case rtrvError := <-retrieveError:
+		log.Println("Retrieving URL:", rtrvError.Error())
+		return "", rtrvError
 	case URL := <-retrieveDone:
 		log.Println("Retrieving URL:", sURL, "as", URL)
 		return URL, nil
@@ -119,19 +119,19 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID string) error {
 	// create channels for listening to the go routine result
 	dumpDone := make(chan bool)
-	dumpError := make(chan string)
+	dumpError := make(chan error)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		_, ok := s.DB[sURL]
 		if ok {
-			dumpError <- "already exists in DB"
+			dumpError <- errors.StorageAlreadyExistsError{ID: sURL}
 			return
 		}
 		s.DB[sURL] = modelstorage.URLMapEntry{URL: URL, UserID: userID}
 		err := s.addToFileDB(sURL, URL, userID)
 		if err != nil {
-			dumpError <- "could not add to file DB"
+			dumpError <- errors.StorageFileWriteError{}
 			return
 		}
 		dumpDone <- true
@@ -142,9 +142,9 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	case <-ctx.Done():
 		log.Println("Dumping URL:", ctx.Err())
 		return errors.ContextTimeoutExceededError{}
-	case errString := <-dumpError:
-		log.Println("Dumping URL:", errString)
-		return errors.StorageAlreadyExistsError{ID: sURL}
+	case dmpError := <-dumpError:
+		log.Println("Dumping URL:", dmpError.Error())
+		return dmpError
 	case <-dumpDone:
 		log.Println("Dumping URL:", sURL, "as", URL)
 		return nil

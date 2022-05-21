@@ -3,9 +3,10 @@ package inpsql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"log"
@@ -45,23 +46,31 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	return &st, nil
 }
 
-// Retrieve returns a URL as a value of a map based on the given sURL as a key of a map.
+// Retrieve returns a URL corresponding to sURL.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
-	query := "SELECT url FROM urls WHERE short_url = $1"
+	// prepare query statement
+	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT url FROM urls WHERE short_url = $1")
+	if err != nil {
+		return "", storageErrors.StatementPSQLError{Msg: err.Error()}
+	}
+	defer selectStmt.Close()
+
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan string)
-	retrieveError := make(chan string)
+	retrieveError := make(chan error)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		err := s.DB.QueryRowContext(ctx, query, sURL).Scan(&URL)
+		err := selectStmt.QueryRowContext(ctx, sURL).Scan(&URL)
 		if err != nil {
-			retrieveError <- "PSQL error"
-			return
-		}
-		if len(URL) == 0 {
-			retrieveError <- "not found in DB"
-			return
+			switch {
+			case errors.Is(err, sql.ErrNoRows):
+				retrieveError <- storageErrors.StorageNotFoundError{ID: sURL}
+				return
+			default:
+				retrieveError <- err
+				return
+			}
 		}
 		retrieveDone <- URL
 	}()
@@ -70,13 +79,10 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	select {
 	case <-ctx.Done():
 		log.Println("Retrieving URL:", ctx.Err())
-		return "", errors.ContextTimeoutExceededError{}
-	case errString := <-retrieveError:
-		log.Println("Retrieving URL:", errString)
-		if errString == "PSQL error" {
-			return "", errors.StoragePSQLError{}
-		}
-		return "", errors.StorageNotFoundError{ID: sURL}
+		return "", storageErrors.ContextTimeoutExceededError{}
+	case rtrvError := <-retrieveError:
+		log.Println("Retrieving URL:", rtrvError.Error())
+		return "", rtrvError
 	case URL := <-retrieveDone:
 		log.Println("Retrieving URL:", sURL, "as", URL)
 		return URL, nil
@@ -85,26 +91,33 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 
 // RetrieveByUserID returns a slice of URL:sURL pairs defined as modelurl.FullURL for one particular user ID.
 func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error) {
-	query := "SELECT * FROM urls WHERE user_id = $1"
+	// prepare query statement
+	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT * FROM urls WHERE user_id = $1")
+	if err != nil {
+		return nil, storageErrors.StatementPSQLError{Msg: err.Error()}
+	}
+	defer selectStmt.Close()
+
 	// create channels for listening to the go routine result
 	retrieveDone := make(chan []modelurl.FullURL)
-	retrieveError := make(chan string)
+	retrieveError := make(chan error)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		rows, err := s.DB.QueryContext(ctx, query, userID)
-		defer rows.Close()
+		rows, err := selectStmt.QueryContext(ctx, userID)
 		if err != nil {
-			retrieveError <- "PSQL error"
+			retrieveError <- err
 			return
 		}
+		defer rows.Close()
+
 		// extract DB row data into corresponding go structure
 		var queryOutput []modelstorage.URLPostgresEntry
 		for rows.Next() {
 			var queryOutputRow modelstorage.URLPostgresEntry
 			err = rows.Scan(&queryOutputRow.ID, &queryOutputRow.UserID, &queryOutputRow.URL, &queryOutputRow.SURL)
 			if err != nil {
-				retrieveError <- "PSQL error"
+				retrieveError <- err
 				return
 			}
 			queryOutput = append(queryOutput, queryOutputRow)
@@ -124,10 +137,10 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	select {
 	case <-ctx.Done():
 		log.Println("Retrieving URLs by user ID:", ctx.Err())
-		return nil, errors.ContextTimeoutExceededError{}
-	case errString := <-retrieveError:
-		log.Println("Retrieving URLs by user ID:", errString)
-		return nil, errors.StoragePSQLError{}
+		return nil, storageErrors.ContextTimeoutExceededError{}
+	case rtrvError := <-retrieveError:
+		log.Println("Retrieving URLs by user ID:", rtrvError.Error())
+		return nil, rtrvError
 	case URLs := <-retrieveDone:
 		log.Println("Retrieving URLs by user ID:", URLs)
 		return URLs, nil
@@ -136,16 +149,38 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 
 // Dump stores a pair of sURL and URL as a key-value pair in a map.
 func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID string) error {
-	query := "INSERT INTO urls (user_id, url, short_url) VALUES ($1, $2, $3)"
+	// prepare query statement
+	// prepare INSERT statement
+	dumpStmt, err := s.DB.PrepareContext(ctx, "INSERT INTO urls (user_id, url, short_url) VALUES ($1, $2, $3)")
+	if err != nil {
+		return nil
+	}
+	defer dumpStmt.Close()
+	// statement for sURL uniqueness is unnecessary since short_url has a "unique" key in DB
+	// prepare statement for checking unique combination of user_id and URL
+	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT EXISTS (SELECT url FROM urls WHERE url = $1 AND user_id = $2)")
+	if err != nil {
+		return nil
+	}
+	defer selectStmt.Close()
+
 	// create channels for listening to the go routine result
 	dumpDone := make(chan bool)
-	dumpError := make(chan string)
+	dumpError := make(chan error)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		_, err := s.DB.ExecContext(ctx, query, userID, URL, sURL)
+		// check that no conflicting entries are present in DB
+		row := selectStmt.QueryRowContext(ctx, URL, userID)
+		var exists bool
+		if err := row.Scan(&exists); err != sql.ErrNoRows && exists {
+			dumpError <- storageErrors.StoragePSQLAlreadyExistsError{UserID: userID, URL: URL}
+			return
+		}
+		_, err := dumpStmt.ExecContext(ctx, userID, URL, sURL)
 		if err != nil {
-			dumpError <- "PSQL error"
+			dumpError <- storageErrors.StatementPSQLError{}
+			return
 		}
 		dumpDone <- true
 	}()
@@ -154,10 +189,10 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	select {
 	case <-ctx.Done():
 		log.Println("Dumping URL:", ctx.Err())
-		return errors.ContextTimeoutExceededError{}
-	case errString := <-dumpError:
-		log.Println("Dumping URL:", errString)
-		return errors.StoragePSQLError{}
+		return storageErrors.ContextTimeoutExceededError{}
+	case dmpError := <-dumpError:
+		log.Println("Dumping URL:", dmpError.Error())
+		return dmpError
 	case <-dumpDone:
 		log.Println("Dumping URL:", sURL, "as", URL)
 		return nil
