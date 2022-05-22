@@ -291,7 +291,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		var responseBatchURLs []modeldto.ResponseBatchURL
 		for _, requestBatchURL := range post {
 			// if error occurs at any iteration - response with 400 or 504 even if some URLs were processed
-			id, err := h.processor.Encode(ctx, requestBatchURL.URL, userID)
+			sURL, err := h.processor.Encode(ctx, requestBatchURL.URL, userID)
 			if err != nil {
 				if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
 					log.Println("JSONHandlePostURLBatch:", err)
@@ -301,8 +301,8 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			log.Println("JSONHandlePostURLBatch: stored", requestBatchURL.URL, "as", id)
-			u.Path = id
+			log.Println("JSONHandlePostURLBatch: stored", requestBatchURL.URL, "as", sURL)
+			u.Path = sURL
 			responseBatchURL := modeldto.ResponseBatchURL{
 				CorrelationID: requestBatchURL.CorrelationID,
 				SURL:          u.String(),
