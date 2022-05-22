@@ -38,6 +38,7 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Use(middleware.DecompressHandle)
 	r.Post("/", urlHandler.HandlePostURL())
 	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
+	r.Post("/api/shorten/batch", urlHandler.JSONHandlePostURLBatch())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	r.Get("/ping", urlHandler.HandlePingDB())

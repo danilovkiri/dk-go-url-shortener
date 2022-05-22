@@ -126,7 +126,7 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 	}{
 		{
 			name: "Correct POST query",
-			URL:  "https://www.yandex.ru",
+			URL:  "https://www.yandex.az",
 			want: want{
 				code: 201,
 			},
@@ -180,7 +180,7 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 		{
 			name: "Correct POST query",
 			URL: modeldto.RequestURL{
-				URL: "https://www.yandex.ru",
+				URL: "https://www.yandex.kz",
 			},
 			want: want{
 				code: 201,
@@ -217,6 +217,66 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 				t.Fatalf("Could not perform JSON POST request")
 			}
 			t.Logf(string(res.Body()))
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}
+
+func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	userIDFull := suite.secretaryService.Encode(uuid.New().String())
+	userIDEmpty := suite.secretaryService.Encode(uuid.New().String())
+	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.yandex.nd", userIDFull)
+	suite.router.Get("/api/user/urls", suite.urlHandler.HandleGetURLsByUserID())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name  string
+		token string
+		want  want
+	}{
+		{
+			name:  "Non-empty GET query",
+			token: userIDFull,
+			want: want{
+				code: 200,
+			},
+		},
+		{
+			name:  "Empty GET query",
+			token: userIDEmpty,
+			want: want{
+				code: 204,
+			},
+		},
+		{
+			name:  "Unauthorized GET query",
+			token: "some_irrelevant_token",
+			want: want{
+				code: 401,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			client := resty.New()
+			client.SetCookie(&http.Cookie{
+				Name:  "user",
+				Value: tt.token,
+				Path:  "/",
+			})
+			res, err := client.R().Get(suite.ts.URL + "/api/user/urls")
+			if err != nil {
+				t.Fatalf("Could not perform GET by userID request")
+			}
 			assert.Equal(t, tt.want.code, res.StatusCode())
 		})
 	}

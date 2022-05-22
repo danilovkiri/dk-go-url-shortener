@@ -122,6 +122,10 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 			}
 			queryOutput = append(queryOutput, queryOutputRow)
 		}
+		err = rows.Err()
+		if err != nil {
+			retrieveError <- err
+		}
 		// extract go structure data into necessary output structure
 		var URLs []modelurl.FullURL
 		for _, entry := range queryOutput {

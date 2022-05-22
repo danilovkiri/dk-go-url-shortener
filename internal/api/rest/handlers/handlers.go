@@ -105,7 +105,7 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	}
 }
 
-// HandleGetURLsByUserID provides client with a json of all sURL:URL pairs it has ever processed from that client.
+// HandleGetURLsByUserID provides shortening service using modeldto.ResponseFullURL schema.
 func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// set context timeout to 500 ms for timing DB operations
@@ -160,7 +160,8 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 	}
 }
 
-// JSONHandlePostURL accepts JSON as {"url":"<some_url>"} and provides client with JSON as {"result":"<shorten_url>"}.
+// JSONHandlePostURL provides shortening service for single URL processing using modeldto.RequestURL and
+// modeldto.ResponseURL schemas.
 func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// set context timeout to 500 ms for timing DB operations
@@ -249,4 +250,77 @@ func getUserID(r *http.Request) (string, error) {
 	}
 	userID := data
 	return hex.EncodeToString(userID), nil
+}
+
+// JSONHandlePostURLBatch provides shortening service for batch processing using modeldto.RequestBatchURL and
+// modeldto.ResponseBatchURL schemas.
+func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// set context timeout to 500 ms for timing DB operations
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+		// check for POST body content type compliance
+		if r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
+		}
+		// read POST body
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// deserialize JSON into struct
+		var post []modeldto.RequestBatchURL
+		err = json.Unmarshal(b, &post)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		userID, err := getUserID(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("JSON POST batch request detected for", post)
+		// prepare url schema for sURL
+		u, err := url.Parse(h.serverConfig.BaseURL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+		// encode URLs into sURLs and store them
+		var responseBatchURLs []modeldto.ResponseBatchURL
+		for _, requestBatchURL := range post {
+			// if error occurs at any iteration - response with 400 or 504 even if some URLs were processed
+			id, err := h.processor.Encode(ctx, requestBatchURL.URL, userID)
+			if err != nil {
+				if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
+					log.Println("JSONHandlePostURLBatch:", err)
+					w.WriteHeader(http.StatusGatewayTimeout)
+				}
+				log.Println("JSONHandlePostURLBatch:", err)
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			log.Println("JSONHandlePostURLBatch: stored", requestBatchURL.URL, "as", id)
+			u.Path = id
+			responseBatchURL := modeldto.ResponseBatchURL{
+				CorrelationID: requestBatchURL.CorrelationID,
+				SURL:          u.String(),
+			}
+			responseBatchURLs = append(responseBatchURLs, responseBatchURL)
+		}
+		// serialize struct into JSON
+		resBody, err := json.Marshal(responseBatchURLs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// set and send response body
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, err = w.Write(resBody)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
 }
