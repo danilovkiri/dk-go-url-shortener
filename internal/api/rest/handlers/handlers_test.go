@@ -284,3 +284,60 @@ func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
 	suite.cancel()
 	suite.wg.Wait()
 }
+
+func (suite *HandlersTestSuite) TestJSONHandlePostURLBatch() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	suite.router.Post("/api/shorten/batch", suite.urlHandler.JSONHandlePostURLBatch())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name  string
+		batch []modeldto.RequestBatchURL
+		want  want
+	}{
+		{
+			name: "Correct POST batch query",
+			batch: []modeldto.RequestBatchURL{
+				{
+					CorrelationID: "test1",
+					URL:           "https://www.kinopoisk.ru",
+				},
+				{
+					CorrelationID: "test2",
+					URL:           "https://www.vk.com",
+				},
+			},
+			want: want{
+				code: 201,
+			},
+		},
+		{
+			name:  "Empty POST batch query",
+			batch: []modeldto.RequestBatchURL{},
+			want: want{
+				code: 400,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			reqBody, _ := json.Marshal(tt.batch)
+			payload := strings.NewReader(string(reqBody))
+			client := resty.New()
+			res, err := client.R().SetBody(payload).Post(suite.ts.URL + "/api/shorten/batch")
+			if err != nil {
+				t.Fatalf("Could not perform JSON POST request")
+			}
+			t.Logf(string(res.Body()))
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}

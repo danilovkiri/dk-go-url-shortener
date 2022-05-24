@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
 	"log"
 	"os"
@@ -30,7 +30,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	}
 	err := st.restore()
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 	// open file outside of goroutine since this operation might not finish prior to encoding operations
 	file, err := os.OpenFile(st.Cfg.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
@@ -63,7 +63,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 		defer s.mu.Unlock()
 		URLMapEntry, ok := s.DB[sURL]
 		if !ok {
-			retrieveError <- errors.StorageNotFoundError{ID: sURL}
+			retrieveError <- &storageErrors.NotFoundError{Err: nil, SURL: sURL}
 			return
 		}
 		retrieveDone <- URLMapEntry.URL
@@ -73,7 +73,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	select {
 	case <-ctx.Done():
 		log.Println("Retrieving URL:", ctx.Err())
-		return "", errors.ContextTimeoutExceededError{}
+		return "", &storageErrors.ContextTimeoutExceededError{Err: ctx.Err()}
 	case rtrvError := <-retrieveError:
 		log.Println("Retrieving URL:", rtrvError.Error())
 		return "", rtrvError
@@ -107,7 +107,7 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	select {
 	case <-ctx.Done():
 		log.Println("Retrieving URLs by UserID:", ctx.Err())
-		return nil, errors.ContextTimeoutExceededError{}
+		return nil, &storageErrors.ContextTimeoutExceededError{Err: ctx.Err()}
 	case URLs := <-retrieveDone:
 		log.Println("Retrieving URL by UserID:", URLs)
 		return URLs, nil
@@ -124,13 +124,13 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 		defer s.mu.Unlock()
 		_, ok := s.DB[sURL]
 		if ok {
-			dumpError <- errors.StorageAlreadyExistsError{ID: sURL}
+			dumpError <- &storageErrors.AlreadyExistsError{Err: nil, URL: sURL, ValidSURL: ""}
 			return
 		}
 		s.DB[sURL] = modelstorage.URLMapEntry{URL: URL, UserID: userID}
 		err := s.addToFileDB(sURL, URL, userID)
 		if err != nil {
-			dumpError <- errors.StorageFileWriteError{}
+			dumpError <- &storageErrors.FileWriteError{Err: err}
 			return
 		}
 		dumpDone <- true
@@ -140,7 +140,7 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	select {
 	case <-ctx.Done():
 		log.Println("Dumping URL:", ctx.Err())
-		return errors.ContextTimeoutExceededError{}
+		return &storageErrors.ContextTimeoutExceededError{Err: ctx.Err()}
 	case dmpError := <-dumpError:
 		log.Println("Dumping URL:", dmpError.Error())
 		return dmpError

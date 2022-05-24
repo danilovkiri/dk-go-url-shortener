@@ -17,6 +17,13 @@ import (
 )
 
 func main() {
+	// make a top-level file logger for logging critical errors
+	flog, err := os.OpenFile(`server.log`, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer flog.Close()
+	mainlog := log.New(flog, `main `, log.LstdFlags|log.Lshortfile)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// add a waiting group
@@ -26,7 +33,7 @@ func main() {
 	// get configuration
 	cfg, err := config.NewDefaultConfiguration()
 	if err != nil {
-		log.Fatal(err)
+		mainlog.Fatal(err)
 	}
 	cfg.ParseFlags()
 	// initialize (or retrieve if present) storage, switch between "infile" and "inpsql" modules
@@ -40,32 +47,32 @@ func main() {
 	}
 
 	if err != nil {
-		log.Fatal(errInit)
+		mainlog.Fatal(errInit)
 	}
 	// initialize server
 	server, err := rest.InitServer(ctx, cfg, storageInit)
 	if err != nil {
-		log.Fatal(err)
+		mainlog.Fatal(err)
 	}
 	// set a listener for os.Signal
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-done
-		log.Print("Server shutdown attempted")
+		mainlog.Print("Server shutdown attempted")
 		ctxTO, cancelTO := context.WithTimeout(ctx, 5*time.Second)
 		defer cancelTO()
 		if err := server.Shutdown(ctxTO); err != nil {
-			log.Fatal("Server shutdown failed:", err)
+			mainlog.Fatal("Server shutdown failed:", err)
 		}
 		cancel()
 	}()
 	// start up the server
-	log.Print("Server start attempted")
+	mainlog.Print("Server start attempted")
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+		mainlog.Fatal(err)
 	}
 	// wait for goroutine in InitStorage to finish before exiting
 	wg.Wait()
-	log.Print("Server shutdown succeeded")
+	mainlog.Print("Server shutdown succeeded")
 }

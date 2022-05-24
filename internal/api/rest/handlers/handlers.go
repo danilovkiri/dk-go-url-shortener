@@ -29,7 +29,7 @@ type URLHandler struct {
 // InitURLHandler initializes a URLHandler object and sets its attributes.
 func InitURLHandler(processor shortener.Processor, serverConfig *config.ServerConfig) (*URLHandler, error) {
 	if processor == nil {
-		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
+		log.Fatal(fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer"))
 	}
 	return &URLHandler{processor: processor, serverConfig: serverConfig}, nil
 }
@@ -46,9 +46,11 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 		// decode sURL into the original URL
 		URL, err := h.processor.Decode(ctx, sURL)
 		if err != nil {
-			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
+			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			if errors.As(err, &contextTimeoutExceededError) {
 				log.Println("HandleGetURL:", err)
-				w.WriteHeader(http.StatusGatewayTimeout)
+				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
 			}
 			log.Println("HandleGetURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -58,50 +60,6 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 		// set and send response
 		w.Header().Set("Location", URL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
-	}
-}
-
-// HandlePostURL stores the original URL with its shortened version.
-func (h *URLHandler) HandlePostURL() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// set context timeout to 500 ms for timing DB operations
-		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
-		defer cancel()
-		// read POST body
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		userID, err := getUserID(r)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		log.Println("POST request detected for", string(b))
-		// encode URL into sURL and store
-		sURL, err := h.processor.Encode(ctx, string(b), userID)
-		if err != nil {
-			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
-				log.Println("HandlePostURL:", err)
-				w.WriteHeader(http.StatusGatewayTimeout)
-			}
-			log.Println("HandlePostURL:", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		log.Println("HandlePostURL: stored", string(b), "as", sURL)
-		// set and send response
-		w.WriteHeader(http.StatusCreated)
-		u, err := url.Parse(h.serverConfig.BaseURL)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-		u.Path = sURL
-		_, err = w.Write([]byte(u.String()))
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
 	}
 }
 
@@ -121,10 +79,13 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 		// retrieve all pairs of sURL:URL for that particular user
 		URLs, err := h.processor.DecodeByUserID(ctx, userID)
 		if err != nil {
-			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
+			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			if errors.As(err, &contextTimeoutExceededError) {
 				log.Println("HandleGetURLsByUserID:", err)
-				w.WriteHeader(http.StatusGatewayTimeout)
+				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
 			}
+			log.Println("HandleGetURLsByUserID:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -136,7 +97,9 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 		// create and serialize response object into JSON
 		u, err := url.Parse(h.serverConfig.BaseURL)
 		if err != nil {
+			log.Println("HandleGetURLsByUserID:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		for _, fullURL := range URLs {
 			u.Path = fullURL.SURL
@@ -148,6 +111,7 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 		}
 		resBody, err := json.Marshal(responseURLs)
 		if err != nil {
+			log.Println("HandleGetURLsByUserID:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -155,6 +119,71 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_, err = w.Write(resBody)
 		if err != nil {
+			log.Println("HandleGetURLsByUserID:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+}
+
+// HandlePostURL stores the original URL with its shortened version.
+func (h *URLHandler) HandlePostURL() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// set context timeout to 500 ms for timing DB operations
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+		// read POST body
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Println("HandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// retrieve user identifier
+		userID, err := getUserID(r)
+		if err != nil {
+			log.Println("HandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// get server base URL
+		u, err := url.Parse(h.serverConfig.BaseURL)
+		if err != nil {
+			log.Println("HandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+		log.Println("POST request detected for", string(b))
+		// encode URL into sURL and store
+		sURL, err := h.processor.Encode(ctx, string(b), userID)
+		if err != nil {
+			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			var alreadyExistsError *storageErrors.AlreadyExistsError
+			if errors.As(err, &contextTimeoutExceededError) {
+				log.Println("HandlePostURL:", err)
+				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
+			} else if errors.As(err, &alreadyExistsError) {
+				// response with existing sURL when URL violates unique constraint
+				u.Path = alreadyExistsError.ValidSURL
+				w.WriteHeader(http.StatusConflict)
+				_, err = w.Write([]byte(u.String()))
+				if err != nil {
+					log.Println("HandlePostURL:", err)
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				return
+			}
+			log.Println("HandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		log.Println("HandlePostURL: stored", string(b), "as", sURL)
+		// set and send response
+		w.WriteHeader(http.StatusCreated)
+		u.Path = sURL
+		_, err = w.Write([]byte(u.String()))
+		if err != nil {
+			log.Println("HandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}
@@ -174,6 +203,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		// read POST body
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
+			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -181,38 +211,70 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		var post modeldto.RequestURL
 		err = json.Unmarshal(b, &post)
 		if err != nil {
+			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		// retrieve user identifier
 		userID, err := getUserID(r)
 		if err != nil {
+			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// get server base URL
+		u, err := url.Parse(h.serverConfig.BaseURL)
+		if err != nil {
+			log.Println("JSONHandlePostURL:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		log.Println("JSON POST request detected for", post.URL)
 		// encode URL into sURL and store them
-		id, err := h.processor.Encode(ctx, post.URL, userID)
+		sURL, err := h.processor.Encode(ctx, post.URL, userID)
 		if err != nil {
-			if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
+			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			var alreadyExistsError *storageErrors.AlreadyExistsError
+			if errors.As(err, &contextTimeoutExceededError) {
 				log.Println("JSONHandlePostURL:", err)
-				w.WriteHeader(http.StatusGatewayTimeout)
+				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
+			} else if errors.As(err, &alreadyExistsError) {
+				// response with existing sURL when URL violates unique constraint
+				u.Path = alreadyExistsError.ValidSURL
+				// serialize struct into JSON
+				resData := modeldto.ResponseURL{
+					SURL: u.String(),
+				}
+				resBody, err := json.Marshal(resData)
+				if err != nil {
+					log.Println("JSONHandlePostURL:", err)
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				// set and send response body
+				w.WriteHeader(http.StatusConflict)
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(resBody)
+				if err != nil {
+					log.Println("JSONHandlePostURL:", err)
+					http.Error(w, err.Error(), http.StatusBadRequest)
+				}
+				return
 			}
 			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		log.Println("JSONHandlePostURL: stored", post.URL, "as", id)
+		log.Println("JSONHandlePostURL: stored", post.URL, "as", sURL)
 		// serialize struct into JSON
-		u, err := url.Parse(h.serverConfig.BaseURL)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-		u.Path = id
+		u.Path = sURL
 		resData := modeldto.ResponseURL{
 			SURL: u.String(),
 		}
 		resBody, err := json.Marshal(resData)
 		if err != nil {
+			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -221,6 +283,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 		_, err = w.Write(resBody)
 		if err != nil {
+			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}
@@ -266,6 +329,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		// read POST body
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
+			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -273,29 +337,52 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		var post []modeldto.RequestBatchURL
 		err = json.Unmarshal(b, &post)
 		if err != nil {
+			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		userID, err := getUserID(r)
 		if err != nil {
+			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		log.Println("JSON POST batch request detected for", post)
+		// check request body for emptiness
+		if len(post) == 0 {
+			log.Println("JSONHandlePostURLBatch:", "empty request body received")
+			http.Error(w, "empty request body received", http.StatusBadRequest)
+			return
+		}
 		// prepare url schema for sURL
 		u, err := url.Parse(h.serverConfig.BaseURL)
 		if err != nil {
+			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 		// encode URLs into sURLs and store them
 		var responseBatchURLs []modeldto.ResponseBatchURL
 		for _, requestBatchURL := range post {
-			// if error occurs at any iteration - response with 400 or 504 even if some URLs were processed
 			sURL, err := h.processor.Encode(ctx, requestBatchURL.URL, userID)
 			if err != nil {
-				if errors.Is(err, storageErrors.ContextTimeoutExceededError{}) {
+				var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+				var alreadyExistsError *storageErrors.AlreadyExistsError
+				if errors.As(err, &contextTimeoutExceededError) {
+					// if ctx.Err() happens, abort all operations
 					log.Println("JSONHandlePostURLBatch:", err)
-					w.WriteHeader(http.StatusGatewayTimeout)
+					http.Error(w, err.Error(), http.StatusGatewayTimeout)
+					return
+				} else if errors.As(err, &alreadyExistsError) {
+					// response with existing sURL when URL violates unique constraint
+					sURL = alreadyExistsError.ValidSURL
+					log.Println("JSONHandlePostURLBatch: stored", requestBatchURL.URL, "as", sURL)
+					u.Path = sURL
+					responseBatchURL := modeldto.ResponseBatchURL{
+						CorrelationID: requestBatchURL.CorrelationID,
+						SURL:          u.String(),
+					}
+					responseBatchURLs = append(responseBatchURLs, responseBatchURL)
+					continue
 				}
 				log.Println("JSONHandlePostURLBatch:", err)
 				http.Error(w, err.Error(), http.StatusBadRequest)
@@ -312,6 +399,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		// serialize struct into JSON
 		resBody, err := json.Marshal(responseBatchURLs)
 		if err != nil {
+			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -320,6 +408,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		w.WriteHeader(http.StatusCreated)
 		_, err = w.Write(resBody)
 		if err != nil {
+			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}

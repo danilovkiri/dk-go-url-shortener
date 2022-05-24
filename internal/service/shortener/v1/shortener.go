@@ -3,13 +3,12 @@ package shortener
 
 import (
 	"context"
+	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"net/url"
-	"time"
-
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
 	"github.com/speps/go-hashids/v2"
+	"net/url"
+	"time"
 )
 
 const SaltKey = "Some Hashing Key"
@@ -26,14 +25,14 @@ type Shortener struct {
 // InitShortener initializes a Shortener object and sets its attributes.
 func InitShortener(s storage.URLStorage) (*Shortener, error) {
 	if s == nil {
-		return nil, &errors.ServiceFoundNilStorage{Msg: "nil storage was passed to service initializer"}
+		return nil, &serviceErrors.ServiceFoundNilStorage{Msg: "nil storage was passed to service initializer"}
 	}
 	hd := hashids.NewData()
 	hd.Salt = SaltKey
 	hd.MinLength = MinLength
 	hashID, err := hashids.NewWithData(hd)
 	if err != nil {
-		return nil, &errors.ServiceInitHashError{Msg: err.Error()}
+		return nil, &serviceErrors.ServiceInitHashError{Msg: err.Error()}
 	}
 	shortener := &Shortener{
 		SaltKey:    SaltKey,
@@ -48,11 +47,11 @@ func InitShortener(s storage.URLStorage) (*Shortener, error) {
 func (short *Shortener) Encode(ctx context.Context, URL string, userID string) (sURL string, err error) {
 	_, err = url.ParseRequestURI(URL)
 	if err != nil {
-		return "", &errors.ServiceIncorrectInputURL{Msg: err.Error()}
+		return "", &serviceErrors.ServiceIncorrectInputURL{Msg: err.Error()}
 	}
 	sURL, err = short.generateSlug()
 	if err != nil {
-		return "", &errors.ServiceEncodingHashError{Msg: err.Error()}
+		return "", &serviceErrors.ServiceEncodingHashError{Msg: err.Error()}
 	}
 	err = short.URLStorage.Dump(ctx, URL, sURL, userID)
 	if err != nil {

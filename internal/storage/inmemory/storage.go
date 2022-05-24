@@ -39,10 +39,10 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	select {
 	case <-ctx.Done():
 		log.Println("Retrieving URL:", ctx.Err())
-		return "", errors.ContextTimeoutExceededError{}
+		return "", &errors.ContextTimeoutExceededError{}
 	case errString := <-retrieveError:
 		log.Println("Retrieving URL:", errString)
-		return "", errors.StorageNotFoundError{ID: sURL}
+		return "", &errors.StorageNotFoundError{ID: sURL}
 	case URL := <-retrieveDone:
 		log.Println("Retrieving URL:", sURL, "as", URL)
 		return URL, nil
@@ -71,7 +71,7 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	select {
 	case <-ctx.Done():
 		log.Println("Retrieving URLs by UserID:", ctx.Err())
-		return nil, errors.ContextTimeoutExceededError{}
+		return nil, &errors.ContextTimeoutExceededError{}
 	case URLs := <-retrieveDone:
 		log.Println("Retrieving URL by UserID:", URLs)
 		return URLs, nil
@@ -97,10 +97,10 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL, userID string) err
 	select {
 	case <-ctx.Done():
 		log.Println("Dumping URL:", ctx.Err())
-		return errors.ContextTimeoutExceededError{}
+		return &errors.ContextTimeoutExceededError{}
 	case errString := <-dumpError:
 		log.Println("Dumping URL:", errString)
-		return errors.StorageAlreadyExistsError{ID: sURL}
+		return &errors.StorageAlreadyExistsError{ID: sURL}
 	case <-dumpDone:
 		log.Println("Dumping URL:", sURL, "as", URL)
 		return nil
