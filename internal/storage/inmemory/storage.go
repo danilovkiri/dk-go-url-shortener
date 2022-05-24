@@ -42,7 +42,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 		return "", &errors.ContextTimeoutExceededError{}
 	case errString := <-retrieveError:
 		log.Println("Retrieving URL:", errString)
-		return "", &errors.StorageNotFoundError{ID: sURL}
+		return "", &errors.NotFoundError{SURL: sURL, Err: nil}
 	case URL := <-retrieveDone:
 		log.Println("Retrieving URL:", sURL, "as", URL)
 		return URL, nil
@@ -100,7 +100,7 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL, userID string) err
 		return &errors.ContextTimeoutExceededError{}
 	case errString := <-dumpError:
 		log.Println("Dumping URL:", errString)
-		return &errors.StorageAlreadyExistsError{ID: sURL}
+		return &errors.AlreadyExistsError{Err: nil, URL: sURL, ValidSURL: ""}
 	case <-dumpDone:
 		log.Println("Dumping URL:", sURL, "as", URL)
 		return nil

@@ -253,8 +253,8 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 					return
 				}
 				// set and send response body
-				w.WriteHeader(http.StatusConflict)
 				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
 				_, err = w.Write(resBody)
 				if err != nil {
 					log.Println("JSONHandlePostURL:", err)
