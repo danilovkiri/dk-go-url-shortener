@@ -6,24 +6,84 @@ import (
 )
 
 type (
-	StorageNotFoundError struct {
-		ID string
+	NotFoundError struct {
+		SURL string
+		Err  error
 	}
-	StorageAlreadyExistsError struct {
-		ID string
+	AlreadyExistsError struct {
+		URL       string
+		ValidSURL string
+		Err       error
 	}
 	ContextTimeoutExceededError struct {
+		Err error
+	}
+	StatementPSQLError struct {
+		Err error
+	}
+	ScanningPSQLError struct {
+		Err error
+	}
+	ExecutionPSQLError struct {
+		Err error
+	}
+	FileWriteError struct {
+		Err error
 	}
 )
 
-func (e StorageNotFoundError) Error() string {
-	return fmt.Sprintf("%s not found in storage", e.ID)
+func (e *NotFoundError) Error() string {
+	return fmt.Sprintf("%s: not found in storage", e.SURL)
 }
 
-func (e StorageAlreadyExistsError) Error() string {
-	return fmt.Sprintf("%s already exists", e.ID)
+func (e *AlreadyExistsError) Error() string {
+	return fmt.Sprintf("%s: already exists in storage", e.URL)
 }
 
-func (e ContextTimeoutExceededError) Error() string {
-	return fmt.Sprintln("context timeout exceeded")
+func (e *ContextTimeoutExceededError) Error() string {
+	return fmt.Sprintf("%s: context timeout exceeded", e.Err.Error())
+}
+
+func (e *ScanningPSQLError) Error() string {
+	return fmt.Sprintf("%s: could not scan rows", e.Err.Error())
+}
+
+func (e *StatementPSQLError) Error() string {
+	return fmt.Sprintf("%s: could not compile statement", e.Err.Error())
+}
+
+func (e *ExecutionPSQLError) Error() string {
+	return fmt.Sprintf("%s: could not query", e.Err.Error())
+}
+
+func (e *FileWriteError) Error() string {
+	return fmt.Sprintf("%s: could not add to file", e.Err.Error())
+}
+
+func (e *NotFoundError) Unwrap() error {
+	return e.Err
+}
+
+func (e *AlreadyExistsError) Unwrap() error {
+	return e.Err
+}
+
+func (e *ContextTimeoutExceededError) Unwrap() error {
+	return e.Err
+}
+
+func (e *ScanningPSQLError) Unwrap() error {
+	return e.Err
+}
+
+func (e *StatementPSQLError) Unwrap() error {
+	return e.Err
+}
+
+func (e *ExecutionPSQLError) Unwrap() error {
+	return e.Err
+}
+
+func (e *FileWriteError) Unwrap() error {
+	return e.Err
 }

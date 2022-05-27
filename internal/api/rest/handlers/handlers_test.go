@@ -3,14 +3,17 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"net/http"
@@ -25,6 +28,8 @@ type HandlersTestSuite struct {
 	storage          storage.URLStorage
 	shortenerService shortenerService.Processor
 	urlHandler       *URLHandler
+	cookieHandler    *middleware.CookieHandler
+	secretaryService *secretary.Secretary
 	router           *chi.Mux
 	ts               *httptest.Server
 	ctx              context.Context
@@ -38,11 +43,6 @@ func (suite *HandlersTestSuite) SetupTest() {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-
-	//ctx := context.Background()
-	//wg := &sync.WaitGroup{}
-	//wg.Add(1)
-
 	// parsing flags causes flag redefined errors
 	//cfg.ParseFlags()
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
@@ -51,6 +51,8 @@ func (suite *HandlersTestSuite) SetupTest() {
 	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
+	suite.secretaryService, _ = secretary.NewSecretaryService(cfg.SecretConfig)
+	suite.cookieHandler, _ = middleware.NewCookieHandler(suite.secretaryService, cfg.SecretConfig)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
 }
@@ -61,7 +63,8 @@ func TestHandlersTestSuite(t *testing.T) {
 }
 
 func (suite *HandlersTestSuite) TestHandleGetURL() {
-	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://yandex.ru")
+	userID := suite.secretaryService.Encode(uuid.New().String())
+	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://www.yandex.ru", userID)
 	suite.router.Get("/{urlID}", suite.urlHandler.HandleGetURL())
 
 	// set tests' parameters
@@ -109,6 +112,7 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 }
 
 func (suite *HandlersTestSuite) TestHandlePostURL() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
 	suite.router.Post("/", suite.urlHandler.HandlePostURL())
 
 	// set tests' parameters
@@ -122,7 +126,7 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 	}{
 		{
 			name: "Correct POST query",
-			URL:  "https://www.yandex.ru",
+			URL:  "https://www.yandex.az",
 			want: want{
 				code: 201,
 			},
@@ -161,6 +165,7 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 }
 
 func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
 	suite.router.Post("/api/shorten", suite.urlHandler.JSONHandlePostURL())
 
 	// set tests' parameters
@@ -175,7 +180,7 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 		{
 			name: "Correct POST query",
 			URL: modeldto.RequestURL{
-				URL: "https://www.yandex.ru",
+				URL: "https://www.yandex.kz",
 			},
 			want: want{
 				code: 201,
@@ -208,6 +213,123 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 			payload := strings.NewReader(string(reqBody))
 			client := resty.New()
 			res, err := client.R().SetBody(payload).Post(suite.ts.URL + "/api/shorten")
+			if err != nil {
+				t.Fatalf("Could not perform JSON POST request")
+			}
+			t.Logf(string(res.Body()))
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}
+
+func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	userIDFull := suite.secretaryService.Encode(uuid.New().String())
+	userIDEmpty := suite.secretaryService.Encode(uuid.New().String())
+	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.yandex.nd", userIDFull)
+	suite.router.Get("/api/user/urls", suite.urlHandler.HandleGetURLsByUserID())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name  string
+		token string
+		want  want
+	}{
+		{
+			name:  "Non-empty GET query",
+			token: userIDFull,
+			want: want{
+				code: 200,
+			},
+		},
+		{
+			name:  "Empty GET query",
+			token: userIDEmpty,
+			want: want{
+				code: 204,
+			},
+		},
+		{
+			name:  "Unauthorized GET query",
+			token: "some_irrelevant_token",
+			want: want{
+				code: 401,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			client := resty.New()
+			client.SetCookie(&http.Cookie{
+				Name:  "user",
+				Value: tt.token,
+				Path:  "/",
+			})
+			res, err := client.R().Get(suite.ts.URL + "/api/user/urls")
+			if err != nil {
+				t.Fatalf("Could not perform GET by userID request")
+			}
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}
+
+func (suite *HandlersTestSuite) TestJSONHandlePostURLBatch() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	suite.router.Post("/api/shorten/batch", suite.urlHandler.JSONHandlePostURLBatch())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name  string
+		batch []modeldto.RequestBatchURL
+		want  want
+	}{
+		{
+			name: "Correct POST batch query",
+			batch: []modeldto.RequestBatchURL{
+				{
+					CorrelationID: "test1",
+					URL:           "https://www.kinopoisk.ru",
+				},
+				{
+					CorrelationID: "test2",
+					URL:           "https://www.vk.com",
+				},
+			},
+			want: want{
+				code: 201,
+			},
+		},
+		{
+			name:  "Empty POST batch query",
+			batch: []modeldto.RequestBatchURL{},
+			want: want{
+				code: 400,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			reqBody, _ := json.Marshal(tt.batch)
+			payload := strings.NewReader(string(reqBody))
+			client := resty.New()
+			res, err := client.R().SetBody(payload).Post(suite.ts.URL + "/api/shorten/batch")
 			if err != nil {
 				t.Fatalf("Could not perform JSON POST request")
 			}
