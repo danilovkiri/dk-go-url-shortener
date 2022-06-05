@@ -122,7 +122,7 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 		var queryOutput []modelstorage.URLPostgresEntry
 		for rows.Next() {
 			var queryOutputRow modelstorage.URLPostgresEntry
-			err = rows.Scan(&queryOutputRow.ID, &queryOutputRow.UserID, &queryOutputRow.URL, &queryOutputRow.SURL)
+			err = rows.Scan(&queryOutputRow.ID, &queryOutputRow.UserID, &queryOutputRow.URL, &queryOutputRow.SURL, &queryOutputRow.IsDeleted)
 			if err != nil {
 				retrieveError <- &storageErrors.ScanningPSQLError{Err: err}
 				return
@@ -215,7 +215,7 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 // DeleteBatch assigns a deletion flag for DB entries.
 func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
 	// prepare DELETE statement
-	deleteStmt, err := s.DB.PrepareContext(ctx, "UPDATE urls SET id_deleted = true WHERE user_id = $1 AND short_url = ANY($2)")
+	deleteStmt, err := s.DB.PrepareContext(ctx, "UPDATE urls SET is_deleted = true WHERE user_id = $1 AND short_url = ANY($2)")
 	if err != nil {
 		return &storageErrors.StatementPSQLError{Err: err}
 	}
@@ -256,7 +256,7 @@ func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string
 	}
 }
 
-// PingDB is a mock for PSQL DB pinger for infile DB handling.
+// PingDB performs DB ping.
 func (s *Storage) PingDB() error {
 	return s.DB.Ping()
 }
@@ -274,7 +274,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 		user_id text not null,
 		url text not null unique,
 		short_url text not null,
-		is_deleted boolean not null DEFAULT false, 
+		is_deleted boolean not null DEFAULT false 
 	);`
 	_, err := s.DB.ExecContext(ctx, query)
 	return err
