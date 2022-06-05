@@ -65,7 +65,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		var queryOutput modelstorage.URLPostgresEntry
-		err := selectStmt.QueryRowContext(ctx, sURL).Scan(&queryOutput)
+		err := selectStmt.QueryRowContext(ctx, sURL).Scan(&queryOutput.ID, &queryOutput.UserID, &queryOutput.URL, &queryOutput.SURL, &queryOutput.IsDeleted)
 		if err != nil {
 			switch {
 			case errors.Is(err, sql.ErrNoRows):
