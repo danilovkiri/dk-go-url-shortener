@@ -320,6 +320,7 @@ func getUserID(r *http.Request) (string, error) {
 	return hex.EncodeToString(userID), nil
 }
 
+//HandleDeleteURLBatch sets a tag for deletion for a batch of URL entries in DB.
 func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// set a basic context due to no timeout and explicit cancelling

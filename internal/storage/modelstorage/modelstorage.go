@@ -19,3 +19,8 @@ type URLPostgresEntry struct {
 	SURL      string `db:"short_url"`
 	IsDeleted bool   `db:"is_deleted"`
 }
+
+type URLChannelEntry struct {
+	UserID string
+	SURLs  []string
+}

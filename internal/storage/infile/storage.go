@@ -150,9 +150,13 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	}
 }
 
-// DeleteBatch is a mock for PSQL DB batch deleter for inmemory DB handling.
+// DeleteBatch is a mock for PSQL DB batch deleter.
 func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
 	return nil
+}
+
+// SendToQueue is a mock for PSQL DB batch concurrent deleter.
+func (s *Storage) SendToQueue(perWorkerBatch modelstorage.URLChannelEntry) {
 }
 
 // restore fills the tmpfs DB with URL-sURL entries from file storage.
@@ -194,12 +198,12 @@ func (s *Storage) addToFileDB(sURL, URL, userID string) error {
 	return nil
 }
 
-// PingDB is a mock for PSQL DB pinger for infile DB handling.
+// PingDB is a mock for PSQL DB pinger.
 func (s *Storage) PingDB() error {
 	return nil
 }
 
-// CloseDB is a mock for PSQL DB closer for infile DB handling.
+// CloseDB is a mock for PSQL DB closer.
 func (s *Storage) CloseDB() error {
 	return nil
 }

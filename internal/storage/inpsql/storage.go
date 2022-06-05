@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgerrcode"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/lib/pq"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"sync"
 )
@@ -21,6 +22,14 @@ type Storage struct {
 	mu  sync.Mutex
 	Cfg *config.StorageConfig
 	DB  *sql.DB
+	ch  chan modelstorage.URLChannelEntry
+}
+
+// DeleteWorker inherits Storage and is separately used for running in errgroup.
+type DeleteWorker struct {
+	ID  int
+	st  *Storage
+	ctx context.Context
 }
 
 // InitStorage initializes a Storage object and sets its attributes.
@@ -29,9 +38,12 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	if err != nil {
 		log.Fatal(err)
 	}
+	// make a channel for tunneling batches for deletion from processor to DB
+	recordCh := make(chan modelstorage.URLChannelEntry)
 	st := Storage{
 		Cfg: cfg,
 		DB:  db,
+		ch:  recordCh,
 	}
 	err = st.createTable(ctx)
 	if err != nil {
@@ -39,7 +51,20 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	}
 	go func() {
 		defer wg.Done()
+		// define errgroup
+		g, _ := errgroup.WithContext(ctx)
+		// start 8 workers listening to recordCh and processing its elements
+		for i := 0; i < 8; i++ {
+			w := &DeleteWorker{ID: i, st: &st, ctx: ctx}
+			g.Go(w.deleteAsync)
+		}
+		// when ctx.Done() close recordCh, wait for workers to complete and close DB
 		<-ctx.Done()
+		close(recordCh)
+		err = g.Wait()
+		if err != nil {
+			log.Fatal(err)
+		}
 		err := st.DB.Close()
 		if err != nil {
 			log.Fatal(err)
@@ -47,6 +72,44 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 		log.Println("PSQL DB connection closed successfully")
 	}()
 	return &st, nil
+}
+
+// SendToQueue sends a modelstorage.URLChannelEntry batch of sURLs from one userID to the deletion task queue.
+func (s *Storage) SendToQueue(perWorkerBatch modelstorage.URLChannelEntry) {
+	s.ch <- perWorkerBatch
+}
+
+// deleteAsync assigns a deletion flag for DB entries under task manager.
+func (d *DeleteWorker) deleteAsync() error {
+	// prepare DELETE statement
+	deleteStmt, err := d.st.DB.PrepareContext(d.ctx, "UPDATE urls SET is_deleted = true WHERE user_id = $1 AND short_url = ANY($2)")
+	if err != nil {
+		return &storageErrors.StatementPSQLError{Err: err}
+	}
+	defer deleteStmt.Close()
+	// begin transaction
+	tx, err := d.st.DB.BeginTx(d.ctx, nil)
+	if err != nil {
+		return &storageErrors.ExecutionPSQLError{Err: err}
+	}
+	defer tx.Rollback()
+	txDeleteStmt := tx.StmtContext(d.ctx, deleteStmt)
+	// listen to the channel new values and process them
+	for record := range d.st.ch {
+		d.st.mu.Lock()
+		defer d.st.mu.Unlock()
+		_, err = txDeleteStmt.ExecContext(
+			d.ctx,
+			record.UserID,
+			pq.Array(record.SURLs),
+		)
+		if err != nil {
+			return &storageErrors.ExecutionPSQLError{Err: err}
+		}
+		log.Println("WID", d.ID, "Deleting URL", record.SURLs)
+		return tx.Commit()
+	}
+	return nil
 }
 
 // Retrieve returns a URL corresponding to sURL.
@@ -159,7 +222,7 @@ func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []m
 	}
 }
 
-// Dump stores a pair of sURL and URL as a key-value pair in a map.
+// Dump stores a pair of sURL and URL as a key-value pair in DB.
 func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID string) error {
 	// prepare INSERT statement
 	dumpStmt, err := s.DB.PrepareContext(ctx, "INSERT INTO urls (user_id, url, short_url) VALUES ($1, $2, $3)")
@@ -213,7 +276,7 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	}
 }
 
-// DeleteBatch assigns a deletion flag for DB entries.
+// DeleteBatch assigns a deletion flag for DB entries, does not use task management.
 func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
 	// prepare DELETE statement
 	deleteStmt, err := s.DB.PrepareContext(ctx, "UPDATE urls SET is_deleted = true WHERE user_id = $1 AND short_url = ANY($2)")
@@ -262,7 +325,7 @@ func (s *Storage) PingDB() error {
 	return s.DB.Ping()
 }
 
-// CloseDB is a mock for PSQL DB closer for infile DB handling.
+// CloseDB performs DB closure.
 func (s *Storage) CloseDB() error {
 	return s.DB.Close()
 }
