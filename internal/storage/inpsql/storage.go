@@ -71,13 +71,14 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 			case errors.Is(err, sql.ErrNoRows):
 				retrieveError <- &storageErrors.NotFoundError{Err: err, SURL: sURL}
 				return
-			case queryOutput.IsDeleted:
-				retrieveError <- &storageErrors.DeletedError{Err: err, SURL: sURL}
-				return
 			default:
 				retrieveError <- err
 				return
 			}
+		}
+		if queryOutput.IsDeleted {
+			retrieveError <- &storageErrors.DeletedError{Err: err, SURL: sURL}
+			return
 		}
 		retrieveDone <- queryOutput.URL
 	}()
