@@ -95,9 +95,9 @@ func (d *DeleteWorker) deleteAsync() error {
 	defer tx.Rollback()
 	txDeleteStmt := tx.StmtContext(d.ctx, deleteStmt)
 	// listen to the channel new values and process them
+	d.st.mu.Lock()
+	defer d.st.mu.Unlock()
 	for record := range d.st.ch {
-		d.st.mu.Lock()
-		defer d.st.mu.Unlock()
 		_, err = txDeleteStmt.ExecContext(
 			d.ctx,
 			record.UserID,
@@ -107,7 +107,10 @@ func (d *DeleteWorker) deleteAsync() error {
 			return &storageErrors.ExecutionPSQLError{Err: err}
 		}
 		log.Println("WID", d.ID, "Deleting URL", record.SURLs)
-		return tx.Commit()
+		err := tx.Commit()
+		if err != nil {
+			return &storageErrors.ExecutionPSQLError{Err: err}
+		}
 	}
 	return nil
 }
