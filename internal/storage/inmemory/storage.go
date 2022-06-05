@@ -107,6 +107,11 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL, userID string) err
 	}
 }
 
+// DeleteBatch is a mock for PSQL DB batch deleter for inmemory DB handling.
+func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
+	return nil
+}
+
 // PingDB is a mock for PSQL DB pinger for inmemory DB handling.
 func (s *Storage) PingDB() error {
 	return nil

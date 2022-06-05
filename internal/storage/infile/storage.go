@@ -150,6 +150,11 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	}
 }
 
+// DeleteBatch is a mock for PSQL DB batch deleter for inmemory DB handling.
+func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
+	return nil
+}
+
 // restore fills the tmpfs DB with URL-sURL entries from file storage.
 func (s *Storage) restore() error {
 	var storageEntries []modelstorage.URLStorageEntry

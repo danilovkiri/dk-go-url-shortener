@@ -41,7 +41,9 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Post("/api/shorten/batch", urlHandler.JSONHandlePostURLBatch())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
+	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	r.Get("/ping", urlHandler.HandlePingDB())
+
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
 		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),

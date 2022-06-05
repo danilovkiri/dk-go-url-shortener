@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/lib/pq"
 	"log"
 	"sync"
 )
@@ -51,7 +52,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 // Retrieve returns a URL corresponding to sURL.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
 	// prepare query statement
-	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT url FROM urls WHERE short_url = $1")
+	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT * FROM urls WHERE short_url = $1")
 	if err != nil {
 		return "", &storageErrors.StatementPSQLError{Err: err}
 	}
@@ -63,18 +64,22 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		err := selectStmt.QueryRowContext(ctx, sURL).Scan(&URL)
+		var queryOutput modelstorage.URLPostgresEntry
+		err := selectStmt.QueryRowContext(ctx, sURL).Scan(&queryOutput)
 		if err != nil {
 			switch {
 			case errors.Is(err, sql.ErrNoRows):
 				retrieveError <- &storageErrors.NotFoundError{Err: err, SURL: sURL}
+				return
+			case queryOutput.IsDeleted:
+				retrieveError <- &storageErrors.DeletedError{Err: err, SURL: sURL}
 				return
 			default:
 				retrieveError <- err
 				return
 			}
 		}
-		retrieveDone <- URL
+		retrieveDone <- queryOutput.URL
 	}()
 
 	// wait for the first channel to retrieve a value
@@ -94,7 +99,7 @@ func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err er
 // RetrieveByUserID returns a slice of URL:sURL pairs defined as modelurl.FullURL for one particular user ID.
 func (s *Storage) RetrieveByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error) {
 	// prepare query statement
-	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT * FROM urls WHERE user_id = $1")
+	selectStmt, err := s.DB.PrepareContext(ctx, "SELECT * FROM urls WHERE user_id = $1 AND is_deleted = false")
 	if err != nil {
 		return nil, &storageErrors.StatementPSQLError{Err: err}
 	}
@@ -207,6 +212,50 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	}
 }
 
+// DeleteBatch assigns a deletion flag for DB entries.
+func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
+	// prepare DELETE statement
+	deleteStmt, err := s.DB.PrepareContext(ctx, "UPDATE urls SET id_deleted = true WHERE user_id = $1 AND short_url = ANY($2)")
+	if err != nil {
+		return &storageErrors.StatementPSQLError{Err: err}
+	}
+	defer deleteStmt.Close()
+	//begin transaction
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return &storageErrors.ExecutionPSQLError{Err: err}
+	}
+	defer tx.Rollback()
+	txDeleteStmt := tx.StmtContext(ctx, deleteStmt)
+	// create channels for listening to the go routine result
+	deleteDone := make(chan bool)
+	deleteError := make(chan error)
+	go func() {
+		_, err = txDeleteStmt.ExecContext(
+			ctx,
+			userID,
+			pq.Array(sURLs),
+		)
+		if err != nil {
+			deleteError <- &storageErrors.ExecutionPSQLError{Err: err}
+		}
+		deleteDone <- true
+	}()
+
+	// wait for the first channel to retrieve a value
+	select {
+	case <-ctx.Done():
+		log.Println("Deleting URL:", ctx.Err())
+		return &storageErrors.ContextTimeoutExceededError{Err: ctx.Err()}
+	case dltError := <-deleteError:
+		log.Println("Deleting URL:", dltError.Error())
+		return dltError
+	case <-deleteDone:
+		log.Println("Deleting URL:", sURLs)
+		return tx.Commit()
+	}
+}
+
 // PingDB is a mock for PSQL DB pinger for infile DB handling.
 func (s *Storage) PingDB() error {
 	return s.DB.Ping()
@@ -224,7 +273,8 @@ func (s *Storage) createTable(ctx context.Context) error {
 		id bigserial not null,
 		user_id text not null,
 		url text not null unique,
-		short_url text not null 
+		short_url text not null,
+		is_deleted boolean not null DEFAULT false, 
 	);`
 	_, err := s.DB.ExecContext(ctx, query)
 	return err

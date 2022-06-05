@@ -15,6 +15,10 @@ type (
 		ValidSURL string
 		Err       error
 	}
+	DeletedError struct {
+		SURL string
+		Err  error
+	}
 	ContextTimeoutExceededError struct {
 		Err error
 	}
@@ -38,6 +42,10 @@ func (e *NotFoundError) Error() string {
 
 func (e *AlreadyExistsError) Error() string {
 	return fmt.Sprintf("%s: already exists in storage", e.URL)
+}
+
+func (e *DeletedError) Error() string {
+	return fmt.Sprintf("%s: was deleted", e.SURL)
 }
 
 func (e *ContextTimeoutExceededError) Error() string {

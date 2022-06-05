@@ -7,6 +7,7 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
 	"github.com/speps/go-hashids/v2"
+	"log"
 	"net/url"
 	"time"
 )
@@ -67,6 +68,14 @@ func (short *Shortener) Decode(ctx context.Context, sURL string) (URL string, er
 		return "", err
 	}
 	return URL, nil
+}
+
+// Delete performs soft removal of URL-sURL entries.
+func (short *Shortener) Delete(ctx context.Context, sURLs []string, userID string) {
+	err := short.URLStorage.DeleteBatch(ctx, sURLs, userID)
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 // DecodeByUserID retrieves and returns all pairs of sURL:URL for a given user ID.

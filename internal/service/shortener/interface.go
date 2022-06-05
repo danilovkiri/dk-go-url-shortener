@@ -10,6 +10,7 @@ import (
 type Processor interface {
 	Encode(ctx context.Context, URL, userID string) (sURL string, err error)
 	Decode(ctx context.Context, sURL string) (URL string, err error)
+	Delete(ctx context.Context, sURLs []string, userID string)
 	DecodeByUserID(ctx context.Context, userID string) (URLs []modelurl.FullURL, err error)
 	PingDB() error
 }

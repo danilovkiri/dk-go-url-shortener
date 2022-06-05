@@ -47,9 +47,14 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 		URL, err := h.processor.Decode(ctx, sURL)
 		if err != nil {
 			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			var deletedError *storageErrors.DeletedError
 			if errors.As(err, &contextTimeoutExceededError) {
 				log.Println("HandleGetURL:", err)
 				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
+			} else if errors.As(err, &deletedError) {
+				log.Println("HandleGetURL:", err)
+				http.Error(w, err.Error(), http.StatusGone)
 				return
 			}
 			log.Println("HandleGetURL:", err)
@@ -315,6 +320,43 @@ func getUserID(r *http.Request) (string, error) {
 	return hex.EncodeToString(userID), nil
 }
 
+func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// set a basic context due to no timeout and explicit cancelling
+		ctx := context.Background()
+		// check for POST body content type compliance
+		if r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
+		}
+		// read DELETE body
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Println("HandleDeleteURLBatch:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// deserialize JSON into slice
+		deleteURLs := make([]string, 0)
+		err = json.Unmarshal(b, &deleteURLs)
+		if err != nil {
+			log.Println("HandleDeleteURLBatch:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		// retrieve user identifier
+		userID, err := getUserID(r)
+		if err != nil {
+			log.Println("HandleDeleteURLBatch:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println("DELETE request detected for", deleteURLs)
+		// perform asynchronous deletion, any underlying errors are for logging only
+		h.processor.Delete(ctx, deleteURLs, userID)
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
 // JSONHandlePostURLBatch provides shortening service for batch processing using modeldto.RequestBatchURL and
 // modeldto.ResponseBatchURL schemas.
 func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
@@ -341,6 +383,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		// retrieve user identifier
 		userID, err := getUserID(r)
 		if err != nil {
 			log.Println("JSONHandlePostURLBatch:", err)
