@@ -23,7 +23,7 @@ type BatchBuffer struct {
 	FlushPartsAmount   int
 	Ctx                context.Context
 	CtxCancelFunc      context.CancelFunc
-	St                 Storage
+	St                 *Storage
 }
 
 // GetFlushPartsAmount is a getter for the BatchBuffer capacity.
@@ -85,7 +85,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 		FlushPartsAmount:   10,
 		Ctx:                ctxBuffer,
 		CtxCancelFunc:      cancelBuffer,
-		St:                 st,
+		St:                 &st,
 	}
 	err = st.createTable(ctx)
 	if err != nil {
