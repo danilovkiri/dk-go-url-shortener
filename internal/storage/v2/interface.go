@@ -4,7 +4,7 @@ package storage
 import (
 	"context"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/modelstorage"
 )
 
 // URLSetter defines a set of methods for types implementing URLSetter.
@@ -15,7 +15,7 @@ type URLSetter interface {
 // URLBatchDeleter defines a set of methods for types implementing URLBatchDeleter.
 type URLBatchDeleter interface {
 	DeleteBatch(ctx context.Context, sURLs []string, userID string) error
-	SendToQueue(perWorkerBatch modelstorage.URLChannelEntry)
+	SendToQueue(item modelstorage.URLChannelEntry)
 }
 
 // URLGetter defines a set of methods for types implementing URLGetter.

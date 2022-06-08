@@ -6,16 +6,54 @@ import (
 	"errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/modelstorage"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/lib/pq"
-	"golang.org/x/sync/errgroup"
 	"log"
 	"sync"
+	"time"
 )
+
+type BatchBuffer struct {
+	RecordCh           chan modelstorage.URLChannelEntry
+	FlushPartsInterval time.Duration
+	FlushPartsAmount   int
+	Ctx                context.Context
+	CtxCancelFunc      context.CancelFunc
+	St                 Storage
+}
+
+// GetFlushPartsAmount is a getter for the BatchBuffer capacity.
+func (bb *BatchBuffer) GetFlushPartsAmount() int {
+	return bb.FlushPartsAmount
+}
+
+// GetFlushTickerDuration is a getter for time.Duration value for a time.Ticker.
+func (bb *BatchBuffer) GetFlushTickerDuration() time.Duration {
+	return bb.FlushPartsInterval
+}
+
+// Flush flushes URL entries from BatchBuffer and sends them for deletion.
+func (bb *BatchBuffer) Flush(batch []modelstorage.URLChannelEntry) error {
+	uniqueMap := make(map[string][]string)
+	for _, b := range batch {
+		if _, exist := uniqueMap[b.UserID]; !exist {
+			uniqueMap[b.UserID] = []string{b.SURL}
+		} else {
+			uniqueMap[b.UserID] = append(uniqueMap[b.UserID], b.SURL)
+		}
+	}
+	for userID, sURLs := range uniqueMap {
+		err := bb.St.DeleteBatch(bb.Ctx, sURLs, userID)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
@@ -23,13 +61,6 @@ type Storage struct {
 	Cfg *config.StorageConfig
 	DB  *sql.DB
 	ch  chan modelstorage.URLChannelEntry
-}
-
-// DeleteWorker inherits Storage and is separately used for running in errgroup.
-type DeleteWorker struct {
-	ID  int
-	st  *Storage
-	ctx context.Context
 }
 
 // InitStorage initializes a Storage object and sets its attributes.
@@ -40,10 +71,21 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	}
 	// make a channel for tunneling batches for deletion from processor to DB
 	recordCh := make(chan modelstorage.URLChannelEntry)
+	// initialize a Storage
 	st := Storage{
 		Cfg: cfg,
 		DB:  db,
 		ch:  recordCh,
+	}
+	// initialize a Buffer (used only here)
+	ctxBuffer, cancelBuffer := context.WithCancel(context.Background())
+	buf := BatchBuffer{
+		RecordCh:           recordCh,
+		FlushPartsInterval: time.Second * 15,
+		FlushPartsAmount:   10,
+		Ctx:                ctxBuffer,
+		CtxCancelFunc:      cancelBuffer,
+		St:                 st,
 	}
 	err = st.createTable(ctx)
 	if err != nil {
@@ -51,70 +93,57 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	}
 	go func() {
 		defer wg.Done()
-		// define errgroup
-		g, _ := errgroup.WithContext(ctx)
-		// start 8 workers listening to recordCh and processing its elements
-		for i := 0; i < 8; i++ {
-			w := &DeleteWorker{ID: i, st: &st, ctx: ctx}
-			g.Go(w.deleteAsync)
+		t := time.NewTicker(buf.GetFlushTickerDuration())
+		parts := make([]modelstorage.URLChannelEntry, 0, buf.GetFlushPartsAmount())
+		for {
+			select {
+			case <-ctx.Done():
+				if len(parts) > 0 {
+					log.Println("Deleting URLs due to context cancellation", parts)
+					err := buf.Flush(parts)
+					if err != nil {
+						log.Fatal(err)
+					}
+				}
+				close(buf.RecordCh)
+				buf.CtxCancelFunc()
+				err := st.DB.Close()
+				if err != nil {
+					log.Fatal(err)
+				}
+				log.Println("PSQL DB connection closed successfully")
+				return
+			case <-t.C:
+				if len(parts) > 0 {
+					log.Println("Deleting URLs due to timeout", parts)
+					err := buf.Flush(parts)
+					if err != nil {
+						log.Fatal(err)
+					}
+					parts = make([]modelstorage.URLChannelEntry, 0, buf.GetFlushPartsAmount())
+				}
+			case part, ok := <-buf.RecordCh:
+				if !ok {
+					return
+				}
+				parts = append(parts, part)
+				if len(parts) >= buf.GetFlushPartsAmount() {
+					log.Println("Deleted URLs due to exceeding capacity", parts)
+					err := buf.Flush(parts)
+					if err != nil {
+						log.Fatal(err)
+					}
+					parts = make([]modelstorage.URLChannelEntry, 0, buf.GetFlushPartsAmount())
+				}
+			}
 		}
-		// when ctx.Done() close recordCh, wait for workers to complete and close DB
-		<-ctx.Done()
-		close(recordCh)
-		err = g.Wait()
-		if err != nil {
-			log.Fatal(err)
-		}
-		err := st.DB.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Println("PSQL DB connection closed successfully")
 	}()
 	return &st, nil
 }
 
 // SendToQueue sends a modelstorage.URLChannelEntry batch of sURLs from one userID to the deletion task queue.
-func (s *Storage) SendToQueue(perWorkerBatch modelstorage.URLChannelEntry) {
-	s.ch <- perWorkerBatch
-}
-
-// deleteAsync assigns a deletion flag for DB entries under task manager.
-func (d *DeleteWorker) deleteAsync() error {
-	// prepare DELETE statement
-	deleteStmt, err := d.st.DB.PrepareContext(d.ctx, "UPDATE urls SET is_deleted = true WHERE user_id = $1 AND short_url = ANY($2)")
-	if err != nil {
-		return &storageErrors.StatementPSQLError{Err: err}
-	}
-	defer deleteStmt.Close()
-	// begin transaction
-	tx, err := d.st.DB.BeginTx(d.ctx, nil)
-	if err != nil {
-		return &storageErrors.ExecutionPSQLError{Err: err}
-	}
-	defer tx.Rollback()
-	txDeleteStmt := tx.StmtContext(d.ctx, deleteStmt)
-	// listen to the channel new values and process them
-	for record := range d.st.ch {
-		d.st.mu.Lock()
-		_, err = txDeleteStmt.ExecContext(
-			d.ctx,
-			record.UserID,
-			pq.Array(record.SURLs),
-		)
-		if err != nil {
-			d.st.mu.Unlock()
-			return &storageErrors.ExecutionPSQLError{Err: err}
-		}
-		log.Println("WID", d.ID, "Deleting URL", record.SURLs)
-		err := tx.Commit()
-		if err != nil {
-			d.st.mu.Unlock()
-			return &storageErrors.ExecutionPSQLError{Err: err}
-		}
-		d.st.mu.Unlock()
-	}
-	return nil
+func (s *Storage) SendToQueue(item modelstorage.URLChannelEntry) {
+	s.ch <- item
 }
 
 // Retrieve returns a URL corresponding to sURL.

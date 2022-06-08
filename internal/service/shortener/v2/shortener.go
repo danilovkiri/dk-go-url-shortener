@@ -5,8 +5,8 @@ import (
 	"context"
 	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/modelstorage"
 	"github.com/speps/go-hashids/v2"
 	"net/url"
 	"time"
@@ -72,18 +72,9 @@ func (short *Shortener) Decode(ctx context.Context, sURL string) (URL string, er
 
 // Delete performs soft removal of URL-sURL entries with task management and resource allocation.
 func (short *Shortener) Delete(ctx context.Context, sURLs []string, userID string) {
-	var perWorkerListURL []string
 	for i := 0; i < len(sURLs); i++ {
-		perWorkerListURL = append(perWorkerListURL, sURLs[i])
-		if len(perWorkerListURL) == 5 {
-			perWorkerBatch := modelstorage.URLChannelEntry{UserID: userID, SURLs: perWorkerListURL}
-			short.URLStorage.SendToQueue(perWorkerBatch)
-			perWorkerListURL = []string{}
-		}
-	}
-	if len(perWorkerListURL) > 0 {
-		perWorkerBatch := modelstorage.URLChannelEntry{UserID: userID, SURLs: perWorkerListURL}
-		short.URLStorage.SendToQueue(perWorkerBatch)
+		item := modelstorage.URLChannelEntry{UserID: userID, SURL: sURLs[i]}
+		short.URLStorage.SendToQueue(item)
 	}
 }
 
