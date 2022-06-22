@@ -10,8 +10,10 @@ require (
 	github.com/jackc/pgconn v1.12.1
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v4 v4.16.1
+	github.com/lib/pq v1.10.2
 	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/stretchr/testify v1.7.1
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )
 
 require (

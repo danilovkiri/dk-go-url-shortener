@@ -13,8 +13,14 @@ type URLMapEntry struct {
 }
 
 type URLPostgresEntry struct {
-	ID     uint   `db:"id"`
-	UserID string `db:"user_id"` // store as a string since we store encoded tokens
-	URL    string `db:"url"`
-	SURL   string `db:"short_url"`
+	ID        uint   `db:"id"`
+	UserID    string `db:"user_id"` // store as a string since we store encoded tokens
+	URL       string `db:"url"`
+	SURL      string `db:"short_url"`
+	IsDeleted bool   `db:"is_deleted"`
+}
+
+type URLChannelEntry struct {
+	UserID string
+	SURL   string
 }

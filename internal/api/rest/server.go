@@ -7,8 +7,8 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v2"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2"
 	"github.com/go-chi/chi"
 	"net/http"
 	"time"
@@ -41,7 +41,9 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Post("/api/shorten/batch", urlHandler.JSONHandlePostURLBatch())
 	r.Get("/{urlID}", urlHandler.HandleGetURL())
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
+	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	r.Get("/ping", urlHandler.HandlePingDB())
+
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
 		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),

@@ -5,8 +5,8 @@ package inmemory
 import (
 	"context"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
 	"log"
 )
 
@@ -105,6 +105,10 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL, userID string) err
 		log.Println("Dumping URL:", sURL, "as", URL)
 		return nil
 	}
+}
+
+// SendToQueue is a mock for PSQL DB batch concurrent deleter for inmemory DB handling.
+func (s *Storage) SendToQueue(perWorkerBatch modelstorage.URLChannelEntry) {
 }
 
 // PingDB is a mock for PSQL DB pinger for inmemory DB handling.

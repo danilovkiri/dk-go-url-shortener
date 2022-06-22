@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/modelstorage"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/modelstorage"
 	"log"
 	"os"
 	"sync"
@@ -150,6 +150,15 @@ func (s *Storage) Dump(ctx context.Context, URL string, sURL string, userID stri
 	}
 }
 
+// DeleteBatch is a mock for PSQL DB batch deleter for infile DB handling.
+func (s *Storage) DeleteBatch(ctx context.Context, sURLs []string, userID string) error {
+	return nil
+}
+
+// SendToQueue is a mock for PSQL DB batch concurrent deleter for infile DB handling.
+func (s *Storage) SendToQueue(item modelstorage.URLChannelEntry) {
+}
+
 // restore fills the tmpfs DB with URL-sURL entries from file storage.
 func (s *Storage) restore() error {
 	var storageEntries []modelstorage.URLStorageEntry
@@ -189,12 +198,12 @@ func (s *Storage) addToFileDB(sURL, URL, userID string) error {
 	return nil
 }
 
-// PingDB is a mock for PSQL DB pinger for infile DB handling.
+// PingDB is a mock for PSQL DB pinger.
 func (s *Storage) PingDB() error {
 	return nil
 }
 
-// CloseDB is a mock for PSQL DB closer for infile DB handling.
+// CloseDB is a mock for PSQL DB closer.
 func (s *Storage) CloseDB() error {
 	return nil
 }

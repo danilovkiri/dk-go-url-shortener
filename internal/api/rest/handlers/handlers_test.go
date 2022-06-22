@@ -9,8 +9,8 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/infile"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
@@ -332,6 +332,47 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURLBatch() {
 			res, err := client.R().SetBody(payload).Post(suite.ts.URL + "/api/shorten/batch")
 			if err != nil {
 				t.Fatalf("Could not perform JSON POST request")
+			}
+			t.Logf(string(res.Body()))
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}
+
+func (suite *HandlersTestSuite) TestHandleDeleteURLBatch() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	suite.router.Delete("/api/user/urls", suite.urlHandler.HandleDeleteURLBatch())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name  string
+		batch []string
+		want  want
+	}{
+		{
+			name:  "Correct DELETE batch request",
+			batch: []string{"hdsf6sd5f", "dsf6sd5f"},
+			want: want{
+				code: 202,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			reqBody, _ := json.Marshal(tt.batch)
+			payload := strings.NewReader(string(reqBody))
+			client := resty.New()
+			res, err := client.R().SetBody(payload).Delete(suite.ts.URL + "/api/user/urls")
+			if err != nil {
+				t.Fatalf("Could not perform DELETE request")
 			}
 			t.Logf(string(res.Body()))
 			assert.Equal(t, tt.want.code, res.StatusCode())
