@@ -22,5 +22,5 @@ type URLPostgresEntry struct {
 
 type URLChannelEntry struct {
 	UserID string
-	SURLs  []string
+	SURL   string
 }

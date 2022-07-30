@@ -11,7 +11,7 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
-	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v2/errors"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
 	"github.com/go-chi/chi"
 	"io/ioutil"
 	"log"

@@ -72,18 +72,9 @@ func (short *Shortener) Decode(ctx context.Context, sURL string) (URL string, er
 
 // Delete performs soft removal of URL-sURL entries with task management and resource allocation.
 func (short *Shortener) Delete(ctx context.Context, sURLs []string, userID string) {
-	var perWorkerListURL []string
 	for i := 0; i < len(sURLs); i++ {
-		perWorkerListURL = append(perWorkerListURL, sURLs[i])
-		if len(perWorkerListURL) == 5 {
-			perWorkerBatch := modelstorage.URLChannelEntry{UserID: userID, SURLs: perWorkerListURL}
-			short.URLStorage.SendToQueue(perWorkerBatch)
-			perWorkerListURL = []string{}
-		}
-	}
-	if len(perWorkerListURL) > 0 {
-		perWorkerBatch := modelstorage.URLChannelEntry{UserID: userID, SURLs: perWorkerListURL}
-		short.URLStorage.SendToQueue(perWorkerBatch)
+		item := modelstorage.URLChannelEntry{UserID: userID, SURL: sURLs[i]}
+		short.URLStorage.SendToQueue(item)
 	}
 }
 
