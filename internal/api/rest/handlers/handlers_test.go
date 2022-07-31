@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -44,9 +45,11 @@ func (suite *HandlersTestSuite) SetupTest() {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	log.Println(cfg.StorageConfig.DatabaseDSN)
 	if cfg.StorageConfig.DatabaseDSN == "" {
 		cfg.StorageConfig.DatabaseDSN = "postgres://kirilldanilov:12345@localhost:5432/urlshort"
 	}
+	log.Println(cfg.StorageConfig.DatabaseDSN)
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.wg = &sync.WaitGroup{}
 	suite.wg.Add(1)
