@@ -13,11 +13,11 @@ require (
 	github.com/lib/pq v1.10.2
 	github.com/speps/go-hashids/v2 v2.0.1
 	github.com/stretchr/testify v1.7.1
-	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

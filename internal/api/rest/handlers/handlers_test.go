@@ -10,7 +10,7 @@ import (
 	shortenerService "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/inpsql"
 	"github.com/go-chi/chi"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 type HandlersTestSuite struct {
@@ -43,12 +44,13 @@ func (suite *HandlersTestSuite) SetupTest() {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-	// parsing flags causes flag redefined errors
-	//cfg.ParseFlags()
+	if cfg.StorageConfig.DatabaseDSN == "" {
+		cfg.StorageConfig.DatabaseDSN = "postgres://kirilldanilov:12345@localhost:5432/urlshort"
+	}
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.wg = &sync.WaitGroup{}
 	suite.wg.Add(1)
-	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
+	suite.storage, _ = inpsql.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
 	suite.secretaryService, _ = secretary.NewSecretaryService(cfg.SecretConfig)
@@ -64,7 +66,11 @@ func TestHandlersTestSuite(t *testing.T) {
 
 func (suite *HandlersTestSuite) TestHandleGetURL() {
 	userID := suite.secretaryService.Encode(uuid.New().String())
-	sURL, _ := suite.shortenerService.Encode(suite.ctx, "https://www.yandex.ru", userID)
+	sURL1, _ := suite.shortenerService.Encode(suite.ctx, "https://www.get-smth-1.com", userID)
+	sURL2, _ := suite.shortenerService.Encode(suite.ctx, "https://www.get-smth-2.com", userID)
+	suite.shortenerService.Delete(suite.ctx, []string{sURL2}, userID)
+	// sleep here due to async deletion and wait for timer to trigger deletion
+	time.Sleep(11 * time.Second)
 	suite.router.Get("/{urlID}", suite.urlHandler.HandleGetURL())
 
 	// set tests' parameters
@@ -78,7 +84,7 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 	}{
 		{
 			name: "Correct GET query",
-			sURL: sURL,
+			sURL: sURL1,
 			want: want{
 				code: 307,
 			},
@@ -88,6 +94,13 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 			sURL: "",
 			want: want{
 				code: 404,
+			},
+		},
+		{
+			name: "Deleted GET query",
+			sURL: sURL2,
+			want: want{
+				code: 410,
 			},
 		},
 	}
@@ -126,7 +139,7 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 	}{
 		{
 			name: "Correct POST query",
-			URL:  "https://www.yandex.az",
+			URL:  "https://www.post-smth-1.com",
 			want: want{
 				code: 201,
 			},
@@ -136,6 +149,13 @@ func (suite *HandlersTestSuite) TestHandlePostURL() {
 			URL:  "",
 			want: want{
 				code: 400,
+			},
+		},
+		{
+			name: "Invalid POST query (conflict)",
+			URL:  "https://www.post-smth-1.com",
+			want: want{
+				code: 409,
 			},
 		},
 		{
@@ -180,7 +200,7 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 		{
 			name: "Correct POST query",
 			URL: modeldto.RequestURL{
-				URL: "https://www.yandex.kz",
+				URL: "https://www.post-smth-2.com",
 			},
 			want: want{
 				code: 201,
@@ -193,6 +213,15 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 			},
 			want: want{
 				code: 400,
+			},
+		},
+		{
+			name: "Invalid POST query (conflict)",
+			URL: modeldto.RequestURL{
+				URL: "https://www.post-smth-2.com",
+			},
+			want: want{
+				code: 409,
 			},
 		},
 		{
@@ -227,9 +256,9 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURL() {
 
 func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
 	suite.router.Use(suite.cookieHandler.CookieHandle)
-	userIDFull := suite.secretaryService.Encode(uuid.New().String())
-	userIDEmpty := suite.secretaryService.Encode(uuid.New().String())
-	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.yandex.nd", userIDFull)
+	userID1 := suite.secretaryService.Encode(uuid.New().String())
+	userID2 := suite.secretaryService.Encode(uuid.New().String())
+	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.get-smth-3.com", userID1)
 	suite.router.Get("/api/user/urls", suite.urlHandler.HandleGetURLsByUserID())
 
 	// set tests' parameters
@@ -243,14 +272,14 @@ func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
 	}{
 		{
 			name:  "Non-empty GET query",
-			token: userIDFull,
+			token: userID1,
 			want: want{
 				code: 200,
 			},
 		},
 		{
 			name:  "Empty GET query",
-			token: userIDEmpty,
+			token: userID2,
 			want: want{
 				code: 204,
 			},
@@ -303,11 +332,15 @@ func (suite *HandlersTestSuite) TestJSONHandlePostURLBatch() {
 			batch: []modeldto.RequestBatchURL{
 				{
 					CorrelationID: "test1",
-					URL:           "https://www.kinopoisk.ru",
+					URL:           "https://www.post-smth-3.com",
 				},
 				{
 					CorrelationID: "test2",
-					URL:           "https://www.vk.com",
+					URL:           "https://www.post-smth-4.com",
+				},
+				{
+					CorrelationID: "test3_conflict",
+					URL:           "https://www.post-smth-2.com",
 				},
 			},
 			want: want{
@@ -362,6 +395,13 @@ func (suite *HandlersTestSuite) TestHandleDeleteURLBatch() {
 				code: 202,
 			},
 		},
+		{
+			name:  "Empty DELETE batch request",
+			batch: []string{},
+			want: want{
+				code: 202,
+			},
+		},
 	}
 
 	// perform each test
@@ -373,6 +413,49 @@ func (suite *HandlersTestSuite) TestHandleDeleteURLBatch() {
 			res, err := client.R().SetBody(payload).Delete(suite.ts.URL + "/api/user/urls")
 			if err != nil {
 				t.Fatalf("Could not perform DELETE request")
+			}
+			t.Logf(string(res.Body()))
+			assert.Equal(t, tt.want.code, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}
+
+func (suite *HandlersTestSuite) TestHandlePingDB() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	suite.router.Get("/ping", suite.urlHandler.HandlePingDB())
+
+	// set tests' parameters
+	type want struct {
+		code int
+	}
+	tests := []struct {
+		name string
+		want want
+	}{
+		{
+			name: "Ping 1",
+			want: want{
+				code: 200,
+			},
+		},
+		{
+			name: "Ping 2",
+			want: want{
+				code: 200,
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			client := resty.New()
+			res, err := client.R().Get(suite.ts.URL + "/ping")
+			if err != nil {
+				t.Fatalf("Could not perform DB ping")
 			}
 			t.Logf(string(res.Body()))
 			assert.Equal(t, tt.want.code, res.StatusCode())

@@ -81,7 +81,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	ctxBuffer, cancelBuffer := context.WithCancel(context.Background())
 	buf := BatchBuffer{
 		RecordCh:           recordCh,
-		FlushPartsInterval: time.Second * 15,
+		FlushPartsInterval: time.Second * 10,
 		FlushPartsAmount:   10,
 		Ctx:                ctxBuffer,
 		CtxCancelFunc:      cancelBuffer,
