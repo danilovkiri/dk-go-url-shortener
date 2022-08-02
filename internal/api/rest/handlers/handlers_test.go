@@ -408,7 +408,7 @@ func BenchmarkInitURLHandler(b *testing.B) {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
@@ -424,14 +424,13 @@ func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
 	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	//cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -453,7 +452,7 @@ func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
@@ -485,7 +484,7 @@ func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)

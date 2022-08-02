@@ -140,13 +140,8 @@ func BenchmarkHandleAbsentCookie(b *testing.B) {
 		w.Header().Set("Content-Type", "text/html")
 		w.Write([]byte("authorized"))
 	})
-	responseCookie := &http.Cookie{
-		Name:  UserCookieKey,
-		Value: "some-expected-token",
-		Raw:   "user=some-expected-token; Path=/",
-		Path:  "/",
-	}
-	s.EXPECT().Encode(gomock.Any()).Return(responseCookie.Value).AnyTimes()
+	responseCookieValue := "some-expected-token"
+	s.EXPECT().Encode(gomock.Any()).Return(responseCookieValue).AnyTimes()
 	client := resty.New()
 	client.SetCookieJar(nil)
 	b.ResetTimer()
