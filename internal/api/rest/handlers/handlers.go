@@ -207,6 +207,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		}
 		// read POST body
 		b, err := ioutil.ReadAll(r.Body)
+		//r.Body.Close()
 		if err != nil {
 			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)

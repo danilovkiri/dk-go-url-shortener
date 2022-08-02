@@ -63,3 +63,15 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, &expCfg, cfg)
 }
+
+func BenchmarkNewDefaultConfiguration(b *testing.B) {
+	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
+	_ = os.Setenv("DATABASE_DSN", "some_dsn")
+	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
+	_ = os.Setenv("BASE_URL", "some_base_url")
+	_ = os.Setenv("USER_KEY", "some_user_key")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = NewDefaultConfiguration()
+	}
+}

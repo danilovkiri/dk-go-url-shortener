@@ -5,7 +5,9 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"math/rand"
 	"testing"
+	"time"
 )
 
 type SecretaryTestSuite struct {
@@ -94,5 +96,50 @@ func (suite *SecretaryTestSuite) TestDecode() {
 			assert.Equal(t, tt.expectedDecoding, res)
 
 		})
+	}
+}
+
+func BenchmarkNewSecretaryService(b *testing.B) {
+	cfg, _ := config.NewSecretConfig()
+	cfg.UserKey = "jds__63h3_7ds"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = NewSecretaryService(cfg)
+	}
+}
+
+func randStringBytes(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func BenchmarkSecretary_Encode(b *testing.B) {
+	cfg, _ := config.NewSecretConfig()
+	sec, _ := NewSecretaryService(cfg)
+	rand.Seed(time.Now().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		randomString := randStringBytes(10)
+		b.StartTimer()
+		sec.Encode(randomString)
+	}
+}
+
+func BenchmarkSecretary_Decode(b *testing.B) {
+	cfg, _ := config.NewSecretConfig()
+	sec, _ := NewSecretaryService(cfg)
+	rand.Seed(time.Now().UnixNano())
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		randomString := randStringBytes(10)
+		randomEncodedString := sec.Encode(randomString)
+		b.StartTimer()
+		sec.Decode(randomEncodedString)
 	}
 }

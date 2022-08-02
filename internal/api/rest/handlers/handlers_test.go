@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -381,4 +382,282 @@ func (suite *HandlersTestSuite) TestHandleDeleteURLBatch() {
 	defer suite.ts.Close()
 	suite.cancel()
 	suite.wg.Wait()
+}
+
+func (suite *HandlersTestSuite) TestHandlePingDB() {
+	suite.router.Use(suite.cookieHandler.CookieHandle)
+	suite.router.Get("/ping", suite.urlHandler.HandlePingDB())
+
+	// perform each test
+	for i := 0; i < 10; i++ {
+		suite.T().Run("ping", func(t *testing.T) {
+			client := resty.New()
+			res, err := client.R().Get(suite.ts.URL + "/ping")
+			if err != nil {
+				t.Fatalf("Could not perform GET request")
+			}
+			t.Logf(string(res.Body()))
+			assert.Equal(t, 200, res.StatusCode())
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
+}
+
+func BenchmarkInitURLHandler(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, _ := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = InitURLHandler(svc, cfg.ServerConfig)
+	}
+}
+
+func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, _ := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	//cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	userID := secretaryService.Encode(uuid.New().String())
+	sURL, _ := svc.Encode(ctx, "https://www.yandex.ru", userID)
+	router.Get("/{urlID}", urlHandler.HandleGetURL())
+	client := resty.New()
+	client.SetRedirectPolicy(resty.RedirectPolicyFunc(func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = client.R().SetPathParams(map[string]string{"urlID": sURL}).Get(ts.URL + "/{urlID}")
+	}
+}
+
+func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, _ := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(cookieHandler.CookieHandle)
+	userIDFull := secretaryService.Encode(uuid.New().String())
+	_, _ = svc.Encode(ctx, "https://www.yandex.nd", userIDFull)
+	router.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
+	client := resty.New()
+	client.SetCookie(&http.Cookie{
+		Name:  "user",
+		Value: userIDFull,
+		Path:  "/",
+	})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = client.R().Get(ts.URL + "/api/user/urls")
+	}
+}
+
+func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, _ := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(cookieHandler.CookieHandle)
+	router.Post("/", urlHandler.HandlePostURL())
+	payload := strings.NewReader("https://www.some-url.com")
+	client := resty.New()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = client.R().SetBody(payload).Post(ts.URL)
+	}
+}
+
+func BenchmarkURLHandler_JSONHandlePostURL(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(cookieHandler.CookieHandle)
+	router.Post("/api/shorten", urlHandler.JSONHandlePostURL())
+	client := resty.New()
+	client.SetCookieJar(nil)
+	b.ResetTimer()
+	b.Run("subtask", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			URL := modeldto.RequestURL{
+				URL: "https://www." + randStringBytes(10) + ".com",
+			}
+			reqBody, _ := json.Marshal(URL)
+			payload := strings.NewReader(string(reqBody))
+			b.StartTimer()
+			_, _ = client.R().SetBody(payload).Post(ts.URL + "/api/shorten")
+		}
+	})
+
+	cancel()
+	wg.Wait()
+}
+
+func BenchmarkURLHandler_HandlePingDB(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(cookieHandler.CookieHandle)
+	router.Post("/ping", urlHandler.HandlePingDB())
+	client := resty.New()
+	client.SetCookieJar(nil)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = client.R().Get(ts.URL + "/ping")
+	}
+	cancel()
+	wg.Wait()
+}
+
+func BenchmarkURLHandler_JSONHandlePostURLBatch(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(cookieHandler.CookieHandle)
+	router.Post("/api/shorten/batch", urlHandler.JSONHandlePostURLBatch())
+	client := resty.New()
+	client.SetCookieJar(nil)
+	b.ResetTimer()
+	b.Run("subtask", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			batch := []modeldto.RequestBatchURL{
+				{
+					CorrelationID: "test1",
+					URL:           "https://www." + randStringBytes(10) + ".com",
+				},
+				{
+					CorrelationID: "test2",
+					URL:           "https://www." + randStringBytes(10) + ".com",
+				},
+			}
+			reqBody, _ := json.Marshal(batch)
+			payload := strings.NewReader(string(reqBody))
+			b.StartTimer()
+			_, _ = client.R().SetBody(payload).Post(ts.URL + "/api/shorten/batch")
+		}
+	})
+	cancel()
+	wg.Wait()
+}
+
+func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
+	cfg, _ := config.NewDefaultConfiguration()
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	svc, _ := shortener.InitShortener(strg)
+	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	router := chi.NewRouter()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(cookieHandler.CookieHandle)
+	router.Delete("/api/user/urls", urlHandler.JSONHandlePostURLBatch())
+	client := resty.New()
+	client.SetCookieJar(nil)
+	b.ResetTimer()
+	b.Run("subtask", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			batch := []string{randStringBytes(10), randStringBytes(10), randStringBytes(10)}
+			reqBody, _ := json.Marshal(batch)
+			payload := strings.NewReader(string(reqBody))
+			b.StartTimer()
+			_, _ = client.R().SetBody(payload).Post(ts.URL + "/api/shorten/batch")
+		}
+	})
+	cancel()
+	wg.Wait()
+}
+
+func randStringBytes(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }
