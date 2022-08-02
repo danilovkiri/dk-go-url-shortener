@@ -387,16 +387,14 @@ func (suite *HandlersTestSuite) TestHandleDeleteURLBatch() {
 func (suite *HandlersTestSuite) TestHandlePingDB() {
 	suite.router.Use(suite.cookieHandler.CookieHandle)
 	suite.router.Get("/ping", suite.urlHandler.HandlePingDB())
-
+	client := resty.New()
 	// perform each test
 	for i := 0; i < 10; i++ {
 		suite.T().Run("ping", func(t *testing.T) {
-			client := resty.New()
 			res, err := client.R().Get(suite.ts.URL + "/ping")
 			if err != nil {
 				t.Fatalf("Could not perform GET request")
 			}
-			t.Logf(string(res.Body()))
 			assert.Equal(t, 200, res.StatusCode())
 		})
 	}

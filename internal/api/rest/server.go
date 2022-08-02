@@ -10,6 +10,7 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/go-chi/chi"
+	chiMiddleware "github.com/go-chi/chi/middleware"
 	"net/http"
 	"time"
 )
@@ -43,14 +44,15 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	r.Get("/ping", urlHandler.HandlePingDB())
+	r.Mount("/debug", chiMiddleware.Profiler())
 
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
 		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
 		Handler:      r,
-		IdleTimeout:  10 * time.Second,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 60 * time.Second,
 	}
 	return srv, nil
 }

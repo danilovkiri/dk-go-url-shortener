@@ -47,6 +47,7 @@ func (bb *BatchBuffer) Flush(batch []modelstorage.URLChannelEntry) error {
 		}
 	}
 	for userID, sURLs := range uniqueMap {
+		log.Println("LALALA", sURLs)
 		err := bb.St.DeleteBatch(bb.Ctx, sURLs, userID)
 		if err != nil {
 			return err
@@ -128,7 +129,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 				}
 				parts = append(parts, part)
 				if len(parts) >= buf.GetFlushPartsAmount() {
-					log.Println("Deleted URLs due to exceeding capacity", parts)
+					log.Println("Deleting URLs due to exceeding capacity", parts)
 					err := buf.Flush(parts)
 					if err != nil {
 						log.Fatal(err)
