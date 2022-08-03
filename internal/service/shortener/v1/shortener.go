@@ -3,17 +3,25 @@ package shortener
 
 import (
 	"context"
-	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
-	"github.com/speps/go-hashids/v2"
 	"net/url"
 	"time"
+
+	"github.com/speps/go-hashids/v2"
+
+	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
 )
 
 const SaltKey = "Some Hashing Key"
 const MinLength = 5
+
+// Check interface implementation explicitly
+var (
+	_ shortener.Processor = (*Shortener)(nil)
+)
 
 // Shortener struct defines data structure handling and provides support for adding new implementations.
 type Shortener struct {

@@ -6,8 +6,9 @@
 package mocks
 
 import (
-	"github.com/golang/mock/gomock"
 	"reflect"
+
+	"github.com/golang/mock/gomock"
 )
 
 // MockSecretary is a mock of Secretary interface.

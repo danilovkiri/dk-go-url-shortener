@@ -3,16 +3,18 @@ package rest
 
 import (
 	"context"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi"
+	chiMiddleware "github.com/go-chi/chi/middleware"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
-	"github.com/go-chi/chi"
-	chiMiddleware "github.com/go-chi/chi/middleware"
-	"net/http"
-	"time"
 )
 
 // InitServer returns a http.Server object ready to be listening and serving .

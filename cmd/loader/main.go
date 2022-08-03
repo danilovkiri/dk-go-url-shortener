@@ -3,13 +3,15 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
-	"github.com/go-resty/resty/v2"
 	"log"
 	"math/rand"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/go-resty/resty/v2"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 )
 
 func randStringBytes(n int) string {

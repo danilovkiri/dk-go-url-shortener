@@ -4,13 +4,20 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
 	"log"
 	"os"
 	"sync"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+)
+
+// Check interface implementation explicitly
+var (
+	_ storage.URLStorage = (*Storage)(nil)
 )
 
 // Storage struct defines data structure handling and provides support for adding new implementations.

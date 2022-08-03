@@ -2,12 +2,14 @@ package secretary
 
 import (
 	"encoding/hex"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 )
 
 type SecretaryTestSuite struct {

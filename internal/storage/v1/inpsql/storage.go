@@ -4,17 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
-	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"log"
+	"sync"
+	"time"
+
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgerrcode"
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/lib/pq"
-	"log"
-	"sync"
-	"time"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
 )
 
 type BatchBuffer struct {
@@ -55,6 +58,11 @@ func (bb *BatchBuffer) Flush(batch []modelstorage.URLChannelEntry) error {
 	}
 	return nil
 }
+
+// Check interface implementation explicitly
+var (
+	_ storage.URLStorage = (*Storage)(nil)
+)
 
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {

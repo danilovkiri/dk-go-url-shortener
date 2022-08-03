@@ -7,12 +7,13 @@ package mocks
 
 import (
 	context "context"
+	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
+
 	modelurl "github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	modelstorage "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
-	gomock "github.com/golang/mock/gomock"
-	reflect "reflect"
 )
-
 
 // MockURLStorage is a mock of URLStorage interface.
 type MockURLStorage struct {

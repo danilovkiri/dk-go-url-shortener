@@ -2,12 +2,14 @@ package shortener
 
 import (
 	"context"
+	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/mocks"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestPingDB(t *testing.T) {

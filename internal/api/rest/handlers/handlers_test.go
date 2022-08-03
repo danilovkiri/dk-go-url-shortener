@@ -3,6 +3,19 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"math/rand"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/go-chi/chi"
+	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
@@ -11,17 +24,6 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
-	"github.com/go-chi/chi"
-	"github.com/go-resty/resty/v2"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-	"math/rand"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"sync"
-	"testing"
 )
 
 type HandlersTestSuite struct {

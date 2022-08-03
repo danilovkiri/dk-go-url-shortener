@@ -3,11 +3,13 @@ package middleware
 
 import (
 	"errors"
+	"net/http"
+
+	"github.com/google/uuid"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary"
-	"github.com/google/uuid"
-	"net/http"
 )
 
 // CookieHandler sets object structure.
