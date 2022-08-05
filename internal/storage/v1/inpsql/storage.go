@@ -20,27 +20,8 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
 )
 
-type BatchBuffer struct {
-	RecordCh           chan modelstorage.URLChannelEntry
-	FlushPartsInterval time.Duration
-	FlushPartsAmount   int
-	Ctx                context.Context
-	CtxCancelFunc      context.CancelFunc
-	St                 *Storage
-}
-
-// GetFlushPartsAmount is a getter for the BatchBuffer capacity.
-func (bb *BatchBuffer) GetFlushPartsAmount() int {
-	return bb.FlushPartsAmount
-}
-
-// GetFlushTickerDuration is a getter for time.Duration value for a time.Ticker.
-func (bb *BatchBuffer) GetFlushTickerDuration() time.Duration {
-	return bb.FlushPartsInterval
-}
-
-// Flush flushes URL entries from BatchBuffer and sends them for deletion.
-func (bb *BatchBuffer) Flush(batch []modelstorage.URLChannelEntry) error {
+// Flush flushes URL entries from buffer and sends them for deletion.
+func (s *Storage) Flush(ctx context.Context, batch []modelstorage.URLChannelEntry) error {
 	uniqueMap := make(map[string][]string)
 	for _, b := range batch {
 		if _, exist := uniqueMap[b.UserID]; !exist {
@@ -50,8 +31,7 @@ func (bb *BatchBuffer) Flush(batch []modelstorage.URLChannelEntry) error {
 		}
 	}
 	for userID, sURLs := range uniqueMap {
-		log.Println("LALALA", sURLs)
-		err := bb.St.DeleteBatch(bb.Ctx, sURLs, userID)
+		err := s.DeleteBatch(ctx, sURLs, userID)
 		if err != nil {
 			return err
 		}
@@ -86,36 +66,29 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 		DB:  db,
 		ch:  recordCh,
 	}
-	// initialize a Buffer (used only here)
-	ctxBuffer, cancelBuffer := context.WithCancel(context.Background())
-	buf := BatchBuffer{
-		RecordCh:           recordCh,
-		FlushPartsInterval: time.Second * 10,
-		FlushPartsAmount:   10,
-		Ctx:                ctxBuffer,
-		CtxCancelFunc:      cancelBuffer,
-		St:                 &st,
-	}
+	const flushPartsAmount = 10
+	const flushPartsInterval = time.Second * 10
+
 	err = st.createTable(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	go func() {
 		defer wg.Done()
-		t := time.NewTicker(buf.GetFlushTickerDuration())
-		parts := make([]modelstorage.URLChannelEntry, 0, buf.GetFlushPartsAmount())
+		t := time.NewTicker(flushPartsInterval)
+		parts := make([]modelstorage.URLChannelEntry, 0, flushPartsAmount)
 		for {
 			select {
 			case <-ctx.Done():
 				if len(parts) > 0 {
 					log.Println("Deleting URLs due to context cancellation", parts)
-					err := buf.Flush(parts)
+					err := st.Flush(ctx, parts)
 					if err != nil {
 						log.Fatal(err)
 					}
 				}
-				close(buf.RecordCh)
-				buf.CtxCancelFunc()
+				close(st.ch)
+				//buf.CtxCancelFunc()
 				err := st.DB.Close()
 				if err != nil {
 					log.Fatal(err)
@@ -125,24 +98,24 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 			case <-t.C:
 				if len(parts) > 0 {
 					log.Println("Deleting URLs due to timeout", parts)
-					err := buf.Flush(parts)
+					err := st.Flush(ctx, parts)
 					if err != nil {
 						log.Fatal(err)
 					}
-					parts = make([]modelstorage.URLChannelEntry, 0, buf.GetFlushPartsAmount())
+					parts = make([]modelstorage.URLChannelEntry, 0, flushPartsAmount)
 				}
-			case part, ok := <-buf.RecordCh:
+			case part, ok := <-st.ch:
 				if !ok {
 					return
 				}
 				parts = append(parts, part)
-				if len(parts) >= buf.GetFlushPartsAmount() {
+				if len(parts) >= flushPartsAmount {
 					log.Println("Deleting URLs due to exceeding capacity", parts)
-					err := buf.Flush(parts)
+					err := st.Flush(ctx, parts)
 					if err != nil {
 						log.Fatal(err)
 					}
-					parts = make([]modelstorage.URLChannelEntry, 0, buf.GetFlushPartsAmount())
+					parts = make([]modelstorage.URLChannelEntry, 0, flushPartsAmount)
 				}
 			}
 		}
