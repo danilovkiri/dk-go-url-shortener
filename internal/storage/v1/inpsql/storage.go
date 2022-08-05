@@ -1,3 +1,4 @@
+// Package inpsql provides data types and methods for DB operations.
 package inpsql
 
 import (

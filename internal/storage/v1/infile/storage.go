@@ -1,3 +1,4 @@
+// Package infile provides data types and methods for local file storage operations.
 package infile
 
 import (
