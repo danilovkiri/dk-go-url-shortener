@@ -27,6 +27,17 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
 )
 
+func randStringBytes(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+// Tests
+
 type HandlersTestSuite struct {
 	suite.Suite
 	storage          storage.URLStorage
@@ -61,7 +72,6 @@ func (suite *HandlersTestSuite) SetupTest() {
 	suite.ts = httptest.NewServer(suite.router)
 }
 
-// TestHandlersTestSuite initializes test suite for being accessible
 func TestHandlersTestSuite(t *testing.T) {
 	suite.Run(t, new(HandlersTestSuite))
 }
@@ -406,6 +416,8 @@ func (suite *HandlersTestSuite) TestHandlePingDB() {
 	suite.wg.Wait()
 }
 
+// Benchmarks
+
 func BenchmarkInitURLHandler(b *testing.B) {
 	cfg, _ := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
@@ -653,14 +665,7 @@ func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
 	wg.Wait()
 }
 
-func randStringBytes(n int) string {
-	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
+// Examples
 
 func ExampleInitURLHandler() {
 	// Parse environment

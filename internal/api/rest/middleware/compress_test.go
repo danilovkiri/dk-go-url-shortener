@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// Tests
+
 type CompressTestSuite struct {
 	suite.Suite
 	router *chi.Mux
@@ -128,6 +130,8 @@ func (suite *CompressTestSuite) TestDecompressHandle() {
 	}
 	defer suite.ts.Close()
 }
+
+// Benchmarks
 
 func BenchmarkCompressHandle(b *testing.B) {
 	router := chi.NewRouter()

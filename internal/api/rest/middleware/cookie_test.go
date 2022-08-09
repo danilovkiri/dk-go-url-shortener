@@ -15,6 +15,8 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/mocks"
 )
 
+// Tests
+
 func TestCookieHandleAbsentCookie(t *testing.T) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -114,6 +116,8 @@ func TestCookieHandleBadCookie(t *testing.T) {
 
 	assert.Equal(t, 401, res.StatusCode())
 }
+
+// Benchmarks
 
 func BenchmarkNewCookieHandler(b *testing.B) {
 	cfg, _ := config.NewSecretConfig()

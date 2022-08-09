@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Tests
+
 func TestNewStorageConfig(t *testing.T) {
 	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
 	_ = os.Setenv("DATABASE_DSN", "some_dsn")
@@ -64,6 +66,8 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	assert.Equal(t, nil, err)
 	assert.Equal(t, &expCfg, cfg)
 }
+
+// Benchmarks
 
 func BenchmarkNewDefaultConfiguration(b *testing.B) {
 	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")

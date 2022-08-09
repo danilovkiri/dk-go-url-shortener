@@ -12,6 +12,8 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
 )
 
+// Tests
+
 func TestPingDB(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -78,6 +80,8 @@ func TestEncode(t *testing.T) {
 	_, err := processor.Encode(context.Background(), URL, userID)
 	assert.Equal(t, nil, err)
 }
+
+// Benchmarks
 
 func BenchmarkInitShortener(b *testing.B) {
 	ctrl := gomock.NewController(b)

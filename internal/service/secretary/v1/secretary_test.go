@@ -12,6 +12,17 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 )
 
+func randStringBytes(n int) string {
+	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+// Tests
+
 type SecretaryTestSuite struct {
 	suite.Suite
 	secretary *Secretary
@@ -101,6 +112,8 @@ func (suite *SecretaryTestSuite) TestDecode() {
 	}
 }
 
+// Benchmarks
+
 func BenchmarkNewSecretaryService(b *testing.B) {
 	cfg, _ := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
@@ -108,15 +121,6 @@ func BenchmarkNewSecretaryService(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _ = NewSecretaryService(cfg)
 	}
-}
-
-func randStringBytes(n int) string {
-	const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
 }
 
 func BenchmarkSecretary_Encode(b *testing.B) {
