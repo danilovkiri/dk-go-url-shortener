@@ -7,17 +7,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
-	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
-	"github.com/go-chi/chi"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/go-chi/chi"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
+	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
 )
 
 // URLHandler defines data structure handling and provides support for adding new implementations.
@@ -207,6 +209,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 		}
 		// read POST body
 		b, err := ioutil.ReadAll(r.Body)
+		//r.Body.Close()
 		if err != nil {
 			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)

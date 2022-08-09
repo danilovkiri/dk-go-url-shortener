@@ -6,7 +6,14 @@ import (
 	"crypto/cipher"
 	"crypto/sha256"
 	"encoding/hex"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary"
+)
+
+// Check interface implementation explicitly
+var (
+	_ secretary.Secretary = (*Secretary)(nil)
 )
 
 // Secretary defines object structure and its attributes.

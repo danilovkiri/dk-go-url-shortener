@@ -26,7 +26,7 @@ func CompressHandle(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		gz, err := gzip.NewWriterLevel(w, gzip.BestCompression)
 		if err != nil {
 			io.WriteString(w, err.Error())
 			return

@@ -2,11 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/inpsql"
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +9,12 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/inpsql"
 )
 
 func main() {

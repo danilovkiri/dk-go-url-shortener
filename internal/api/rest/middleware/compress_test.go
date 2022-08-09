@@ -3,17 +3,20 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
-	"github.com/go-chi/chi"
-	"github.com/go-resty/resty/v2"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi"
+	"github.com/go-resty/resty/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
+
+// Tests
 
 type CompressTestSuite struct {
 	suite.Suite
@@ -126,4 +129,55 @@ func (suite *CompressTestSuite) TestDecompressHandle() {
 		})
 	}
 	defer suite.ts.Close()
+}
+
+// Benchmarks
+
+func BenchmarkCompressHandle(b *testing.B) {
+	router := chi.NewRouter()
+	client := resty.New()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(CompressHandle)
+	router.Get("/get", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("textstring"))
+	})
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = client.R().SetHeader("Accept-Encoding", "gzip").Get(ts.URL + "/get")
+	}
+}
+
+func BenchmarkDecompressHandle(b *testing.B) {
+	router := chi.NewRouter()
+	client := resty.New()
+	ts := httptest.NewServer(router)
+	defer ts.Close()
+	router.Use(DecompressHandle)
+	router.Post("/post", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		b, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+	var bts bytes.Buffer
+	gz := gzip.NewWriter(&bts)
+	if _, err := gz.Write([]byte("some_data")); err != nil {
+		log.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		log.Fatal(err)
+	}
+	payload := bts.String()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = client.R().SetHeader("Content-Encoding", "gzip").SetBody(payload).Post(ts.URL + "/post")
+	}
 }

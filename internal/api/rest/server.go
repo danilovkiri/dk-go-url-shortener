@@ -3,15 +3,18 @@ package rest
 
 import (
 	"context"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi"
+	chiMiddleware "github.com/go-chi/chi/middleware"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
-	"github.com/go-chi/chi"
-	"net/http"
-	"time"
 )
 
 // InitServer returns a http.Server object ready to be listening and serving .
@@ -43,14 +46,15 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	r.Get("/ping", urlHandler.HandlePingDB())
+	r.Mount("/debug", chiMiddleware.Profiler())
 
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
 		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
 		Handler:      r,
-		IdleTimeout:  10 * time.Second,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+		ReadTimeout:  60 * time.Second,
+		WriteTimeout: 60 * time.Second,
 	}
 	return srv, nil
 }
