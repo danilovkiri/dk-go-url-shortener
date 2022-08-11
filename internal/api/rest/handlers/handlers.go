@@ -254,10 +254,10 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 				resData := modeldto.ResponseURL{
 					SURL: u.String(),
 				}
-				resBody, err := json.Marshal(resData)
-				if err != nil {
-					log.Println("JSONHandlePostURL:", err)
-					http.Error(w, err.Error(), http.StatusBadRequest)
+				resBody, err1 := json.Marshal(resData)
+				if err1 != nil {
+					log.Println("JSONHandlePostURL:", err1)
+					http.Error(w, err1.Error(), http.StatusBadRequest)
 					return
 				}
 				// set and send response body
@@ -410,16 +410,16 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		// encode URLs into sURLs and store them
 		var responseBatchURLs []modeldto.ResponseBatchURL
 		for _, requestBatchURL := range post {
-			sURL, err := h.processor.Encode(ctx, requestBatchURL.URL, userID)
-			if err != nil {
+			sURL, err1 := h.processor.Encode(ctx, requestBatchURL.URL, userID)
+			if err1 != nil {
 				var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 				var alreadyExistsError *storageErrors.AlreadyExistsError
-				if errors.As(err, &contextTimeoutExceededError) {
+				if errors.As(err1, &contextTimeoutExceededError) {
 					// if ctx.Err() happens, abort all operations
-					log.Println("JSONHandlePostURLBatch:", err)
-					http.Error(w, err.Error(), http.StatusGatewayTimeout)
+					log.Println("JSONHandlePostURLBatch:", err1)
+					http.Error(w, err1.Error(), http.StatusGatewayTimeout)
 					return
-				} else if errors.As(err, &alreadyExistsError) {
+				} else if errors.As(err1, &alreadyExistsError) {
 					// response with existing sURL when URL violates unique constraint
 					sURL = alreadyExistsError.ValidSURL
 					log.Println("JSONHandlePostURLBatch: stored", requestBatchURL.URL, "as", sURL)
@@ -431,8 +431,8 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 					responseBatchURLs = append(responseBatchURLs, responseBatchURL)
 					continue
 				}
-				log.Println("JSONHandlePostURLBatch:", err)
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				log.Println("JSONHandlePostURLBatch:", err1)
+				http.Error(w, err1.Error(), http.StatusBadRequest)
 				return
 			}
 			log.Println("JSONHandlePostURLBatch: stored", requestBatchURL.URL, "as", sURL)
