@@ -7,7 +7,6 @@ import (
 )
 
 func TestMyAnalyzer(t *testing.T) {
-	// функция analysistest.Run применяет тестируемый анализатор OsExitInMainAnalyzer
-	// к пакетам из папки testdata и проверяет ожидания
+	// function analysistest.Run applies OsExitInMainAnalyzer to packages from testdata and checks expected result
 	analysistest.Run(t, analysistest.TestData(), OsExitInMainAnalyzer, "./...")
 }

@@ -29,7 +29,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 						if call, ok := ex.X.(*ast.CallExpr); ok {
 							// look for selector expressions
 							if selector, ok := call.Fun.(*ast.SelectorExpr); ok {
-								// check that selector's X.Name is `osz and Sel.Name is `Exit`
+								// check that selector's X.Name is `os` and Sel.Name is `Exit`
 								if i, ok := selector.X.(*ast.Ident); ok && i.Name == `os` {
 									if selector.Sel.Name == `Exit` {
 										pass.Reportf(selector.Pos(), "call to os.Exit in main body")
