@@ -24,7 +24,7 @@ var (
 	buildCommit  string
 )
 
-func main() {
+func printBuildMetadata() {
 	// print out build parameters
 	switch buildVersion {
 	case "":
@@ -44,6 +44,11 @@ func main() {
 	default:
 		fmt.Printf("Build commit: %s\n", buildCommit)
 	}
+}
+
+func main() {
+	// print out build parameters
+	printBuildMetadata()
 	// make a top-level file logger for logging critical errors
 	flog, err := os.OpenFile(`server.log`, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
