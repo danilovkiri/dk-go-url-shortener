@@ -4,18 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi"
+	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
-
-	"github.com/go-chi/chi"
-	"github.com/go-resty/resty/v2"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
@@ -38,6 +37,16 @@ func randStringBytes(n int) string {
 
 // Tests
 
+func TestInitURLHandler_Fail(t *testing.T) {
+	cfg := config.NewDefaultConfiguration()
+	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
+	cfg.ServerConfig.ServerAddress = ":8080"
+	cfg.ServerConfig.BaseURL = "http://localhost:8080"
+	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	_, err := InitURLHandler(nil, cfg.ServerConfig)
+	assert.Equal(t, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer"), err)
+}
+
 type HandlersTestSuite struct {
 	suite.Suite
 	storage          storage.URLStorage
@@ -53,7 +62,7 @@ type HandlersTestSuite struct {
 }
 
 func (suite *HandlersTestSuite) SetupTest() {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
@@ -66,7 +75,7 @@ func (suite *HandlersTestSuite) SetupTest() {
 	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
 	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
-	suite.secretaryService, _ = secretary.NewSecretaryService(cfg.SecretConfig)
+	suite.secretaryService = secretary.NewSecretaryService(cfg.SecretConfig)
 	suite.cookieHandler, _ = middleware.NewCookieHandler(suite.secretaryService, cfg.SecretConfig)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
@@ -102,6 +111,13 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 			sURL: "",
 			want: want{
 				code: 404,
+			},
+		},
+		{
+			name: "Absent GET query",
+			sURL: "some_absent_sURL",
+			want: want{
+				code: 400,
 			},
 		},
 	}
@@ -289,6 +305,7 @@ func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
 			})
 			res, err := client.R().Get(suite.ts.URL + "/api/user/urls")
 			if err != nil {
+				t.Log(err)
 				t.Fatalf("Could not perform GET by userID request")
 			}
 			assert.Equal(t, tt.want.code, res.StatusCode())
@@ -419,7 +436,7 @@ func (suite *HandlersTestSuite) TestHandlePingDB() {
 // Benchmarks
 
 func BenchmarkInitURLHandler(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -435,7 +452,7 @@ func BenchmarkInitURLHandler(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -445,7 +462,7 @@ func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -463,7 +480,7 @@ func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -473,7 +490,7 @@ func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -495,7 +512,7 @@ func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -505,7 +522,7 @@ func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -521,7 +538,7 @@ func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
 }
 
 func BenchmarkURLHandler_JSONHandlePostURL(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -531,7 +548,7 @@ func BenchmarkURLHandler_JSONHandlePostURL(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -559,7 +576,7 @@ func BenchmarkURLHandler_JSONHandlePostURL(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandlePingDB(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -569,7 +586,7 @@ func BenchmarkURLHandler_HandlePingDB(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -587,7 +604,7 @@ func BenchmarkURLHandler_HandlePingDB(b *testing.B) {
 }
 
 func BenchmarkURLHandler_JSONHandlePostURLBatch(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -597,7 +614,7 @@ func BenchmarkURLHandler_JSONHandlePostURLBatch(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -631,7 +648,7 @@ func BenchmarkURLHandler_JSONHandlePostURLBatch(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	cfg.ServerConfig.ServerAddress = ":8080"
 	cfg.ServerConfig.BaseURL = "http://localhost:8080"
 	cfg.StorageConfig.FileStoragePath = "url_storage.json"
@@ -641,7 +658,7 @@ func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
 	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
 	svc, _ := shortener.InitShortener(strg)
 	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
@@ -669,7 +686,7 @@ func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
 
 func ExampleInitURLHandler() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -697,7 +714,7 @@ func ExampleInitURLHandler() {
 
 func ExampleURLHandler_HandleGetURL() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -717,7 +734,7 @@ func ExampleURLHandler_HandleGetURL() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	//// Initialize cookie handler
 	//cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server
@@ -745,7 +762,7 @@ func ExampleURLHandler_HandleGetURL() {
 
 func ExampleURLHandler_HandlePostURL() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -765,7 +782,7 @@ func ExampleURLHandler_HandlePostURL() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	// Initialize cookie handler
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server
@@ -791,7 +808,7 @@ func ExampleURLHandler_HandlePostURL() {
 
 func ExampleURLHandler_JSONHandlePostURL() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -811,7 +828,7 @@ func ExampleURLHandler_JSONHandlePostURL() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	// Initialize cookie handler
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server
@@ -841,7 +858,7 @@ func ExampleURLHandler_JSONHandlePostURL() {
 
 func ExampleURLHandler_JSONHandlePostURLBatch() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -861,7 +878,7 @@ func ExampleURLHandler_JSONHandlePostURLBatch() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	// Initialize cookie handler
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server
@@ -898,7 +915,7 @@ func ExampleURLHandler_JSONHandlePostURLBatch() {
 
 func ExampleURLHandler_HandleDeleteURLBatch() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -918,7 +935,7 @@ func ExampleURLHandler_HandleDeleteURLBatch() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	// Initialize cookie handler
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server
@@ -946,7 +963,7 @@ func ExampleURLHandler_HandleDeleteURLBatch() {
 
 func ExampleURLHandler_HandleGetURLsByUserID() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -966,7 +983,7 @@ func ExampleURLHandler_HandleGetURLsByUserID() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	// Initialize cookie handler
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server
@@ -998,7 +1015,7 @@ func ExampleURLHandler_HandleGetURLsByUserID() {
 
 func ExampleURLHandler_HandlePingDB() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
@@ -1018,7 +1035,7 @@ func ExampleURLHandler_HandlePingDB() {
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	// Initialize cookie handler
 	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	// Initialize server

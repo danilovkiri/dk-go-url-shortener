@@ -46,8 +46,6 @@ func (c *CookieHandler) CookieHandle(next http.Handler) http.Handler {
 			}
 			http.SetCookie(w, newCookie)
 			r.AddCookie(newCookie)
-		} else if err != nil {
-			http.Error(w, "Cookie crumbled", http.StatusInternalServerError)
 		} else {
 			_, err := c.sec.Decode(cookie.Value)
 			if err != nil {

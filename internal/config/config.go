@@ -3,7 +3,6 @@ package config
 
 import (
 	"flag"
-
 	"github.com/caarlos0/env/v6"
 )
 
@@ -32,54 +31,36 @@ type SecretConfig struct {
 }
 
 // NewStorageConfig sets up a storage configuration.
-func NewStorageConfig() (*StorageConfig, error) {
+func NewStorageConfig() *StorageConfig {
 	cfg := StorageConfig{}
-	err := env.Parse(&cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &cfg, nil
+	_ = env.Parse(&cfg)
+	return &cfg
 }
 
 // NewServerConfig sets up a server configuration.
-func NewServerConfig() (*ServerConfig, error) {
+func NewServerConfig() *ServerConfig {
 	cfg := ServerConfig{}
-	err := env.Parse(&cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &cfg, nil
+	_ = env.Parse(&cfg)
+	return &cfg
 }
 
 // NewSecretConfig sets up a secret configuration.
-func NewSecretConfig() (*SecretConfig, error) {
+func NewSecretConfig() *SecretConfig {
 	cfg := SecretConfig{}
-	err := env.Parse(&cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &cfg, nil
+	_ = env.Parse(&cfg)
+	return &cfg
 }
 
 // NewDefaultConfiguration sets up a total configuration.
-func NewDefaultConfiguration() (*Config, error) {
-	serverCfg, err := NewServerConfig()
-	if err != nil {
-		return nil, err
-	}
-	storageCfg, err := NewStorageConfig()
-	if err != nil {
-		return nil, err
-	}
-	secretConfig, err := NewSecretConfig()
-	if err != nil {
-		return nil, err
-	}
+func NewDefaultConfiguration() *Config {
+	serverCfg := NewServerConfig()
+	storageCfg := NewStorageConfig()
+	secretConfig := NewSecretConfig()
 	return &Config{
 		ServerConfig:  serverCfg,
 		StorageConfig: storageCfg,
 		SecretConfig:  secretConfig,
-	}, nil
+	}
 }
 
 // isFlagPassed checks whether the flag was set in CLI
@@ -93,14 +74,7 @@ func isFlagPassed(name string) bool {
 	return found
 }
 
-// ParseFlags parses command line arguments and stores them
-func (c *Config) ParseFlags() {
-	a := flag.String("a", ":8080", "Server address")
-	b := flag.String("b", "http://localhost:8080", "Base url")
-	f := flag.String("f", "url_storage.json", "File storage path")
-	// DatabaseDSN scheme: "postgres://username:password@localhost:5432/database_name"
-	d := flag.String("d", "", "PSQL DB connection")
-	flag.Parse()
+func (c *Config) redefineConfig(a, b, f, d *string) {
 	// priority: flag -> env -> default flag
 	// note that env parsing precedes flag parsing
 	if isFlagPassed("a") || c.ServerConfig.ServerAddress == "" {
@@ -115,4 +89,16 @@ func (c *Config) ParseFlags() {
 	if isFlagPassed("d") || c.StorageConfig.DatabaseDSN == "" {
 		c.StorageConfig.DatabaseDSN = *d
 	}
+}
+
+// ParseFlags parses command line arguments and stores them
+func (c *Config) ParseFlags() {
+	a := flag.String("a", ":8080", "Server address")
+	b := flag.String("b", "http://localhost:8080", "Base url")
+	f := flag.String("f", "url_storage.json", "File storage path")
+	// DatabaseDSN scheme: "postgres://username:password@localhost:5432/database_name"
+	d := flag.String("d", "", "PSQL DB connection")
+	flag.Parse()
+	c.redefineConfig(a, b, f, d)
+
 }

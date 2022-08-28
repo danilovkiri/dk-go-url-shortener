@@ -23,6 +23,22 @@ func randStringBytes(n int) string {
 
 // Tests
 
+func TestDecode_Fail(t *testing.T) {
+	cfg := config.NewSecretConfig()
+	cfg.UserKey = "jds__63h3_7ds"
+	secretary := NewSecretaryService(cfg)
+	var newNonce []byte
+	for i := 0; i < len(secretary.nonce); i++ {
+		newNonce = append(newNonce, 1)
+	}
+	secretary.nonce = newNonce
+	res, err := secretary.Decode("c277fd4361e8c0e81e90bc030a31621ff6ef71503544154b7f0e29aae1f69dec0a00")
+	if err != nil {
+		assert.Equal(t, err.Error(), "cipher: message authentication failed")
+	}
+	assert.Equal(t, "", res)
+}
+
 type SecretaryTestSuite struct {
 	suite.Suite
 	secretary *Secretary
@@ -30,9 +46,9 @@ type SecretaryTestSuite struct {
 }
 
 func (suite *SecretaryTestSuite) SetupTest() {
-	suite.config, _ = config.NewSecretConfig()
+	suite.config = config.NewSecretConfig()
 	suite.config.UserKey = "jds__63h3_7ds"
-	suite.secretary, _ = NewSecretaryService(suite.config)
+	suite.secretary = NewSecretaryService(suite.config)
 }
 
 func TestSecretaryTestSuite(t *testing.T) {
@@ -115,17 +131,17 @@ func (suite *SecretaryTestSuite) TestDecode() {
 // Benchmarks
 
 func BenchmarkNewSecretaryService(b *testing.B) {
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = NewSecretaryService(cfg)
+		_ = NewSecretaryService(cfg)
 	}
 }
 
 func BenchmarkSecretary_Encode(b *testing.B) {
-	cfg, _ := config.NewSecretConfig()
-	sec, _ := NewSecretaryService(cfg)
+	cfg := config.NewSecretConfig()
+	sec := NewSecretaryService(cfg)
 	rand.Seed(time.Now().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -137,8 +153,8 @@ func BenchmarkSecretary_Encode(b *testing.B) {
 }
 
 func BenchmarkSecretary_Decode(b *testing.B) {
-	cfg, _ := config.NewSecretConfig()
-	sec, _ := NewSecretaryService(cfg)
+	cfg := config.NewSecretConfig()
+	sec := NewSecretaryService(cfg)
 	rand.Seed(time.Now().UnixNano())
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -31,7 +31,7 @@ type URLHandler struct {
 // InitURLHandler initializes a URLHandler object and sets its attributes.
 func InitURLHandler(processor shortener.Processor, serverConfig *config.ServerConfig) (*URLHandler, error) {
 	if processor == nil {
-		log.Fatal(fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer"))
+		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
 	}
 	return &URLHandler{processor: processor, serverConfig: serverConfig}, nil
 }
@@ -453,10 +453,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		// set and send response body
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write(resBody)
-		if err != nil {
-			log.Println("JSONHandlePostURLBatch:", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
+		_, _ = w.Write(resBody)
+
 	}
 }

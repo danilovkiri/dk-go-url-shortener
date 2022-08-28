@@ -63,10 +63,7 @@ func main() {
 	// set number of wg members to 1 (this will be the persistStorage goroutine)
 	wg.Add(1)
 	// get configuration
-	cfg, err := config.NewDefaultConfiguration()
-	if err != nil {
-		mainlog.Fatal(err)
-	}
+	cfg := config.NewDefaultConfiguration()
 	cfg.ParseFlags()
 	// initialize (or retrieve if present) storage, switch between "infile" and "inpsql" modules
 	var errInit error

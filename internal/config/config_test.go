@@ -12,34 +12,31 @@ import (
 func TestNewStorageConfig(t *testing.T) {
 	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
 	_ = os.Setenv("DATABASE_DSN", "some_dsn")
-	cfg, err := NewStorageConfig()
+	cfg := NewStorageConfig()
 	expCfg := StorageConfig{
 		"some_file",
 		"some_dsn",
 	}
-	assert.Equal(t, nil, err)
 	assert.Equal(t, &expCfg, cfg)
 }
 
 func TestNewServerConfig(t *testing.T) {
 	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
 	_ = os.Setenv("BASE_URL", "some_base_url")
-	cfg, err := NewServerConfig()
+	cfg := NewServerConfig()
 	expCfg := ServerConfig{
 		"some_server_address",
 		"some_base_url",
 	}
-	assert.Equal(t, nil, err)
 	assert.Equal(t, &expCfg, cfg)
 }
 
 func TestNewSecretConfig(t *testing.T) {
 	_ = os.Setenv("USER_KEY", "some_user_key")
-	cfg, err := NewSecretConfig()
+	cfg := NewSecretConfig()
 	expCfg := SecretConfig{
 		"some_user_key",
 	}
-	assert.Equal(t, nil, err)
 	assert.Equal(t, &expCfg, cfg)
 }
 
@@ -49,7 +46,7 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
 	_ = os.Setenv("BASE_URL", "some_base_url")
 	_ = os.Setenv("USER_KEY", "some_user_key")
-	cfg, err := NewDefaultConfiguration()
+	cfg := NewDefaultConfiguration()
 	expCfg := Config{
 		&ServerConfig{
 			"some_server_address",
@@ -63,7 +60,31 @@ func TestNewDefaultConfiguration(t *testing.T) {
 			"some_user_key",
 		},
 	}
-	assert.Equal(t, nil, err)
+	assert.Equal(t, &expCfg, cfg)
+}
+
+func TestConfig_ParseFlagsFlagsPassed(t *testing.T) {
+	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
+	_ = os.Setenv("DATABASE_DSN", "") // empty to test passing as a flag
+	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
+	_ = os.Setenv("BASE_URL", "some_base_url")
+	_ = os.Setenv("USER_KEY", "some_user_key")
+	cfg := NewDefaultConfiguration()
+	os.Args = []string{"test", "-a", ":8080", "-b", "http://localhost:8080", "-f", "url_storage.json", "-d", "postgres://username:password@localhost:5432/database_name"}
+	cfg.ParseFlags()
+	expCfg := Config{
+		&ServerConfig{
+			":8080",
+			"http://localhost:8080",
+		},
+		&StorageConfig{
+			"url_storage.json",
+			"postgres://username:password@localhost:5432/database_name",
+		},
+		&SecretConfig{
+			"some_user_key",
+		},
+	}
 	assert.Equal(t, &expCfg, cfg)
 }
 
@@ -77,6 +98,6 @@ func BenchmarkNewDefaultConfiguration(b *testing.B) {
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = NewDefaultConfiguration()
+		_ = NewDefaultConfiguration()
 	}
 }

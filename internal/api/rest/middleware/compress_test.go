@@ -100,6 +100,11 @@ func (suite *CompressTestSuite) TestDecompressHandle() {
 			queryEncoding: "gzip",
 			payload:       "some_other_data",
 		},
+		{
+			name:          "empty payload",
+			queryEncoding: "gzip",
+			payload:       "",
+		},
 	}
 
 	// perform each test

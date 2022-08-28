@@ -26,11 +26,7 @@ func CompressHandle(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		gz, err := gzip.NewWriterLevel(w, gzip.BestCompression)
-		if err != nil {
-			io.WriteString(w, err.Error())
-			return
-		}
+		gz, _ := gzip.NewWriterLevel(w, gzip.BestCompression)
 		defer gz.Close()
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
@@ -44,11 +40,7 @@ func DecompressHandle(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		gz, err := gzip.NewReader(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+		gz, _ := gzip.NewReader(r.Body)
 		r.Body = gz
 		next.ServeHTTP(w, r)
 	})

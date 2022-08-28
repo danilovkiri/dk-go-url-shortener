@@ -27,10 +27,7 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	if err != nil {
 		return nil, err
 	}
-	secretaryService, err := secretary.NewSecretaryService(cfg.SecretConfig)
-	if err != nil {
-		return nil, err
-	}
+	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
 	cookieHandler, err := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
 	if err != nil {
 		return nil, err

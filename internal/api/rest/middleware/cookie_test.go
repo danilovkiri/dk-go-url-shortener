@@ -17,11 +17,18 @@ import (
 
 // Tests
 
+func TestNewCookieHandler_Fail(t *testing.T) {
+	cfg := config.NewSecretConfig()
+	_, err := NewCookieHandler(nil, cfg)
+	assert.Equal(t, "nil secretary was passed to service initializer", err.Error())
+
+}
+
 func TestCookieHandleAbsentCookie(t *testing.T) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -59,7 +66,7 @@ func TestCookieHandleGoodCookie(t *testing.T) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -90,7 +97,7 @@ func TestCookieHandleBadCookie(t *testing.T) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -120,7 +127,7 @@ func TestCookieHandleBadCookie(t *testing.T) {
 // Benchmarks
 
 func BenchmarkNewCookieHandler(b *testing.B) {
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
@@ -135,7 +142,7 @@ func BenchmarkHandleAbsentCookie(b *testing.B) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
@@ -160,7 +167,7 @@ func BenchmarkHandleGoodCookie(b *testing.B) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
@@ -190,7 +197,7 @@ func BenchmarkHandleBadCookie(b *testing.B) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
-	cfg, _ := config.NewSecretConfig()
+	cfg := config.NewSecretConfig()
 	cfg.UserKey = "jds__63h3_7ds"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
