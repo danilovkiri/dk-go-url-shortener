@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,7 +18,37 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/inpsql"
 )
 
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
+func printBuildMetadata() {
+	// print out build parameters
+	switch buildVersion {
+	case "":
+		fmt.Printf("Build version: %s\n", "N/A")
+	default:
+		fmt.Printf("Build version: %s\n", buildVersion)
+	}
+	switch buildDate {
+	case "":
+		fmt.Printf("Build date: %s\n", "N/A")
+	default:
+		fmt.Printf("Build date: %s\n", buildDate)
+	}
+	switch buildCommit {
+	case "":
+		fmt.Printf("Build commit: %s\n", "N/A")
+	default:
+		fmt.Printf("Build commit: %s\n", buildCommit)
+	}
+}
+
 func main() {
+	// print out build parameters
+	printBuildMetadata()
 	// make a top-level file logger for logging critical errors
 	flog, err := os.OpenFile(`server.log`, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -46,8 +77,7 @@ func main() {
 	default:
 		storageInit, errInit = inpsql.InitStorage(ctx, wg, cfg.StorageConfig)
 	}
-
-	if err != nil {
+	if errInit != nil {
 		mainlog.Fatal(errInit)
 	}
 	// initialize server
