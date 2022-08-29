@@ -4,7 +4,6 @@ package rest
 import (
 	"context"
 	"expvar"
-	_ "expvar"
 	"net/http"
 	"time"
 
