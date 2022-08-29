@@ -21,7 +21,6 @@ func TestNewCookieHandler_Fail(t *testing.T) {
 	cfg := config.NewSecretConfig()
 	_, err := NewCookieHandler(nil, cfg)
 	assert.Equal(t, "nil secretary was passed to service initializer", err.Error())
-
 }
 
 func TestCookieHandleAbsentCookie(t *testing.T) {

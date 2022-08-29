@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -20,6 +21,17 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
+)
+
+// register counters for handlers queries
+var (
+	numberOfRequestsGetURL           = expvar.NewInt("handlers.numberOfRequestsGetURL")
+	numberOfRequestsGetURLByUserID   = expvar.NewInt("handlers.numberOfRequestsGetURLByUserID")
+	numberOfRequestsPostURL          = expvar.NewInt("handlers.numberOfRequestsPostURL")
+	numberOfRequestsJSONPostURL      = expvar.NewInt("handlers.numberOfRequestsJSONPostURL")
+	numberOfRequestsPingDB           = expvar.NewInt("handlers.numberOfRequestsPingDB")
+	numberOfRequestsDeleteURLBatch   = expvar.NewInt("handlers.numberOfRequestsDeleteURLBatch")
+	numberOfRequestsJSONPostURLBatch = expvar.NewInt("handlers.numberOfRequestsJSONPostURLBatch")
 )
 
 // URLHandler defines data structure handling and provides support for adding new implementations.
@@ -39,6 +51,7 @@ func InitURLHandler(processor shortener.Processor, serverConfig *config.ServerCo
 // HandleGetURL provides client with a redirect to the original URL accessed by shortened URL.
 func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsGetURL.Add(1)
 		// set context timeout to 500 ms for timing DB operations
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
@@ -73,6 +86,7 @@ func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 // HandleGetURLsByUserID provides shortening service using modeldto.ResponseFullURL schema.
 func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsGetURLByUserID.Add(1)
 		// set context timeout to 500 ms for timing DB operations
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
@@ -135,6 +149,7 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 // HandlePostURL stores the original URL with its shortened version.
 func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsPostURL.Add(1)
 		// set context timeout to 500 ms for timing DB operations
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
@@ -200,6 +215,7 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 // modeldto.ResponseURL schemas.
 func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsJSONPostURL.Add(1)
 		// set context timeout to 500 ms for timing DB operations
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
@@ -300,6 +316,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 // HandlePingDB handles PSQL DB pinging to check connection status.
 func (h *URLHandler) HandlePingDB() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsPingDB.Add(1)
 		err := h.processor.PingDB()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -326,6 +343,7 @@ func getUserID(r *http.Request) (string, error) {
 //HandleDeleteURLBatch sets a tag for deletion for a batch of URL entries in DB.
 func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsDeleteURLBatch.Add(1)
 		// set a basic context due to no timeout and explicit cancelling
 		ctx := context.Background()
 		// check for POST body content type compliance
@@ -365,6 +383,7 @@ func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
 // modeldto.ResponseBatchURL schemas.
 func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		numberOfRequestsJSONPostURLBatch.Add(1)
 		// set context timeout to 500 ms for timing DB operations
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()

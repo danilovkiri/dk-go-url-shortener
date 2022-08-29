@@ -3,11 +3,10 @@ package rest
 
 import (
 	"context"
+	"expvar"
+	_ "expvar"
 	"net/http"
 	"time"
-
-	"github.com/go-chi/chi"
-	chiMiddleware "github.com/go-chi/chi/middleware"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
@@ -15,7 +14,18 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	"github.com/go-chi/chi"
+	chiMiddleware "github.com/go-chi/chi/middleware"
 )
+
+var (
+	serverStart = time.Now()
+)
+
+// uptime returns time in seconds since the server start-up.
+func uptime() interface{} {
+	return int64(time.Since(serverStart).Seconds())
+}
 
 // InitServer returns a http.Server object ready to be listening and serving .
 func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStorage) (server *http.Server, err error) {
@@ -43,7 +53,8 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	r.Get("/ping", urlHandler.HandlePingDB())
-	r.Mount("/debug", chiMiddleware.Profiler())
+	r.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
+	expvar.Publish("system.uptime", expvar.Func(uptime))
 
 	srv := &http.Server{
 		Addr: cfg.ServerConfig.ServerAddress,
