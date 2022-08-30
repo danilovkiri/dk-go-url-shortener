@@ -3,8 +3,12 @@ package rest
 
 import (
 	"context"
+	"crypto/tls"
 	"expvar"
+	"golang.org/x/crypto/acme/autocert"
+	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
@@ -55,13 +59,51 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
 	expvar.Publish("system.uptime", expvar.Func(uptime))
 
-	srv := &http.Server{
-		Addr: cfg.ServerConfig.ServerAddress,
-		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
-		Handler:      r,
-		IdleTimeout:  60 * time.Second,
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 60 * time.Second,
+	var srv *http.Server
+	if !cfg.ServerConfig.EnableHTTPS {
+		srv = &http.Server{
+			Addr:         cfg.ServerConfig.ServerAddress,
+			Handler:      r,
+			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  60 * time.Second,
+			WriteTimeout: 60 * time.Second,
+		}
+	} else {
+		certManager := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("localhost"), // to be changed to real value
+			Cache:      autocert.DirCache("../../certs"),
+		}
+		tlsConfig := certManager.TLSConfig()
+		tlsConfig.GetCertificate = getSelfSignedOrLetsEncryptCert(&certManager)
+		srv = &http.Server{
+			Addr:         cfg.ServerConfig.ServerAddress,
+			Handler:      r,
+			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  60 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			TLSConfig:    tlsConfig,
+		}
 	}
+
 	return srv, nil
+}
+
+// getSelfSignedOrLetsEncryptCert implements fallback for certificate usage in case autocert fails
+func getSelfSignedOrLetsEncryptCert(certManager *autocert.Manager) func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		dirCache, ok := certManager.Cache.(autocert.DirCache)
+		if !ok {
+			dirCache = "../../certs"
+		}
+		keyFile := filepath.Join(string(dirCache), hello.ServerName+".key")
+		crtFile := filepath.Join(string(dirCache), hello.ServerName+".crt")
+		certificate, err := tls.LoadX509KeyPair(crtFile, keyFile)
+		if err != nil {
+			log.Printf("%s\nFalling back to Letsencrypt\n", err)
+			return certManager.GetCertificate(hello)
+		}
+		log.Println("Loaded self-signed certificate.")
+		return &certificate, err
+	}
 }

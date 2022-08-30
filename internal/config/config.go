@@ -17,6 +17,7 @@ type Config struct {
 type ServerConfig struct {
 	ServerAddress string `env:"SERVER_ADDRESS"`
 	BaseURL       string `env:"BASE_URL"`
+	EnableHTTPS   bool   `env:"ENABLE_HTTPS"`
 }
 
 // StorageConfig retrieves file storage-related parameters from environment.
@@ -74,7 +75,7 @@ func isFlagPassed(name string) bool {
 	return found
 }
 
-func (c *Config) redefineConfig(a, b, f, d *string) {
+func (c *Config) redefineConfig(a, b, f, d *string, s *bool) {
 	// priority: flag -> env -> default flag
 	// note that env parsing precedes flag parsing
 	if isFlagPassed("a") || c.ServerConfig.ServerAddress == "" {
@@ -89,6 +90,9 @@ func (c *Config) redefineConfig(a, b, f, d *string) {
 	if isFlagPassed("d") || c.StorageConfig.DatabaseDSN == "" {
 		c.StorageConfig.DatabaseDSN = *d
 	}
+	if isFlagPassed("s") || c.ServerConfig.EnableHTTPS == false {
+		c.ServerConfig.EnableHTTPS = *s
+	}
 }
 
 // ParseFlags parses command line arguments and stores them
@@ -98,7 +102,8 @@ func (c *Config) ParseFlags() {
 	f := flag.String("f", "url_storage.json", "File storage path")
 	// DatabaseDSN scheme: "postgres://username:password@localhost:5432/database_name"
 	d := flag.String("d", "", "PSQL DB connection")
+	s := flag.Bool("s", false, "Use HTTPS connection")
 	flag.Parse()
-	c.redefineConfig(a, b, f, d)
+	c.redefineConfig(a, b, f, d, s)
 
 }

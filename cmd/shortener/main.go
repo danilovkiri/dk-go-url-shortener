@@ -97,8 +97,16 @@ func main() {
 	}()
 	// start up the server
 	mainlog.Print("Server start attempted")
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		mainlog.Fatal(err)
+	if !cfg.ServerConfig.EnableHTTPS {
+		mainlog.Print("Using HTTP")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			mainlog.Fatal(err)
+		}
+	} else {
+		mainlog.Print("Using HTTPS")
+		if err := server.ListenAndServeTLS("../../certs/localhost.crt", "../../certs/localhost.key"); err != nil && err != http.ErrServerClosed {
+			mainlog.Fatal(err)
+		}
 	}
 	// wait for goroutine in InitStorage to finish before exiting
 	wg.Wait()
