@@ -90,7 +90,7 @@ func (c *Config) redefineConfig(a, b, f, d *string, s *bool) {
 	if isFlagPassed("d") || c.StorageConfig.DatabaseDSN == "" {
 		c.StorageConfig.DatabaseDSN = *d
 	}
-	if isFlagPassed("s") || c.ServerConfig.EnableHTTPS == false {
+	if isFlagPassed("s") || !c.ServerConfig.EnableHTTPS {
 		c.ServerConfig.EnableHTTPS = *s
 	}
 }
