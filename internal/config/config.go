@@ -91,6 +91,9 @@ func isFlagPassed(name string) bool {
 // parseAppConfig parses JSON configuration file
 func (cfg *Config) parseAppConfig(path string) (*AppConfigJSON, error) {
 	configFile, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
 	defer func(configFile *os.File) {
 		err1 := configFile.Close()
 		if err1 != nil {
@@ -98,9 +101,6 @@ func (cfg *Config) parseAppConfig(path string) (*AppConfigJSON, error) {
 		}
 	}(configFile)
 	reader := bufio.NewReader(configFile)
-	if err != nil {
-		return nil, err
-	}
 	fi, _ := configFile.Stat()
 	var appConfigBytes = make([]byte, fi.Size())
 	_, _ = reader.Read(appConfigBytes)
