@@ -3,7 +3,7 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -75,7 +75,7 @@ func (suite *CompressTestSuite) TestDecompressHandle() {
 	suite.router.Use(DecompressHandle)
 	suite.router.Post("/post", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -162,7 +162,7 @@ func BenchmarkDecompressHandle(b *testing.B) {
 	router.Use(DecompressHandle)
 	router.Post("/post", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Fatal(err)
 		}

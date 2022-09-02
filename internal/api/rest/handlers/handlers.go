@@ -8,7 +8,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -154,7 +154,7 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 		defer cancel()
 		// read POST body
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Println("HandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -224,7 +224,7 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
 		}
 		// read POST body
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		//r.Body.Close()
 		if err != nil {
 			log.Println("JSONHandlePostURL:", err)
@@ -340,7 +340,7 @@ func getUserID(r *http.Request) (string, error) {
 	return hex.EncodeToString(userID), nil
 }
 
-//HandleDeleteURLBatch sets a tag for deletion for a batch of URL entries in DB.
+// HandleDeleteURLBatch sets a tag for deletion for a batch of URL entries in DB.
 func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		numberOfRequestsDeleteURLBatch.Add(1)
@@ -351,7 +351,7 @@ func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
 			http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
 		}
 		// read DELETE body
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Println("HandleDeleteURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -392,7 +392,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 			http.Error(w, "Invalid Content-Type", http.StatusBadRequest)
 		}
 		// read POST body
-		b, err := ioutil.ReadAll(r.Body)
+		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
