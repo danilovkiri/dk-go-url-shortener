@@ -103,7 +103,7 @@ func getSelfSignedOrLetsEncryptCert(certManager *autocert.Manager) func(hello *t
 			log.Printf("%s\nFalling back to Letsencrypt\n", err)
 			return certManager.GetCertificate(hello)
 		}
-		log.Println("Loaded self-signed certificate.")
+		log.Println("Loading self-signed certificate.")
 		return &certificate, err
 	}
 }

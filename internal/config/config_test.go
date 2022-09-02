@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/json"
+	"io/fs"
 	"os"
 	"testing"
 
@@ -10,6 +12,7 @@ import (
 // Tests
 
 func TestNewStorageConfig(t *testing.T) {
+	os.Clearenv()
 	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
 	_ = os.Setenv("DATABASE_DSN", "some_dsn")
 	cfg := NewStorageConfig()
@@ -21,6 +24,7 @@ func TestNewStorageConfig(t *testing.T) {
 }
 
 func TestNewServerConfig(t *testing.T) {
+	os.Clearenv()
 	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
 	_ = os.Setenv("BASE_URL", "some_base_url")
 	_ = os.Setenv("ENABLE_HTTPS", "false")
@@ -34,6 +38,7 @@ func TestNewServerConfig(t *testing.T) {
 }
 
 func TestNewSecretConfig(t *testing.T) {
+	os.Clearenv()
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	cfg := NewSecretConfig()
 	expCfg := SecretConfig{
@@ -43,6 +48,7 @@ func TestNewSecretConfig(t *testing.T) {
 }
 
 func TestNewDefaultConfiguration(t *testing.T) {
+	os.Clearenv()
 	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
 	_ = os.Setenv("DATABASE_DSN", "some_dsn")
 	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
@@ -67,20 +73,16 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	assert.Equal(t, &expCfg, cfg)
 }
 
-func TestConfig_ParseFlagsFlagsPassed(t *testing.T) {
-	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
-	_ = os.Setenv("DATABASE_DSN", "") // empty to test passing as a flag
-	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")
-	_ = os.Setenv("BASE_URL", "some_base_url")
+func TestConfig_ParseFlags(t *testing.T) {
+	os.Clearenv()
 	_ = os.Setenv("USER_KEY", "some_user_key")
-	_ = os.Setenv("ENABLE_HTTPS", "false")
 	cfg := NewDefaultConfiguration()
-	os.Args = []string{"test", "-a", ":8080", "-b", "http://localhost:8080", "-f", "url_storage.json", "-d", "postgres://username:password@localhost:5432/database_name", "-s", "true"}
+	os.Args = []string{"test", "-a", ":8080", "-q", "config_test.json", "-f", "url_storage.json", "-d", "postgres://username:password@localhost:5432/database_name", "-s", "true"}
 	cfg.ParseFlags()
 	expCfg := Config{
 		&ServerConfig{
 			":8080",
-			"http://localhost:8080",
+			"json_base_url",
 			true,
 		},
 		&StorageConfig{
@@ -94,9 +96,26 @@ func TestConfig_ParseFlagsFlagsPassed(t *testing.T) {
 	assert.Equal(t, &expCfg, cfg)
 }
 
+func TestConfig_parseAppConfigPathError(t *testing.T) {
+	os.Clearenv()
+	cfg := NewDefaultConfiguration()
+	_, err := cfg.parseAppConfig("nonexistent_file.json")
+	var error *fs.PathError
+	assert.ErrorAs(t, err, &error)
+}
+
+func TestConfig_parseAppConfigUnmarshallError(t *testing.T) {
+	os.Clearenv()
+	cfg := NewDefaultConfiguration()
+	_, err := cfg.parseAppConfig("config_test_bad.json")
+	var error *json.SyntaxError
+	assert.ErrorAs(t, err, &error)
+}
+
 // Benchmarks
 
 func BenchmarkNewDefaultConfiguration(b *testing.B) {
+	os.Clearenv()
 	_ = os.Setenv("FILE_STORAGE_PATH", "some_file")
 	_ = os.Setenv("DATABASE_DSN", "some_dsn")
 	_ = os.Setenv("SERVER_ADDRESS", "some_server_address")

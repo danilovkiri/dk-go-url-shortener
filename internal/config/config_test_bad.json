@@ -1,0 +1,6 @@
+{
+  "server_address": "json_server_address",
+  "base_url": "json_base_url",
+  "file_storage_path": "json_storage_path",
+  "database_dsn": "json_database_dsn",
+  "enable_https": false
