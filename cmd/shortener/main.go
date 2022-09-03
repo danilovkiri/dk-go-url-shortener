@@ -84,7 +84,7 @@ func main() {
 	}
 	// set a listener for os.Signal
 	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-done
 		mainlog.Print("Server shutdown attempted")
