@@ -5,11 +5,12 @@ import (
 	"context"
 	"crypto/tls"
 	"expvar"
-	"golang.org/x/crypto/acme/autocert"
 	"log"
 	"net/http"
 	"path/filepath"
 	"time"
+
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
@@ -36,12 +37,12 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	if err != nil {
 		return nil, err
 	}
-	urlHandler, err := handlers.InitURLHandler(shortenerService, cfg.ServerConfig)
+	urlHandler, err := handlers.InitURLHandler(shortenerService, cfg)
 	if err != nil {
 		return nil, err
 	}
-	secretaryService := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, err := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, err := middleware.NewCookieHandler(secretaryService, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +61,9 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	expvar.Publish("system.uptime", expvar.Func(uptime))
 
 	var srv *http.Server
-	if !cfg.ServerConfig.EnableHTTPS {
+	if !cfg.EnableHTTPS {
 		srv = &http.Server{
-			Addr:         cfg.ServerConfig.ServerAddress,
+			Addr:         cfg.ServerAddress,
 			Handler:      r,
 			IdleTimeout:  60 * time.Second,
 			ReadTimeout:  60 * time.Second,
@@ -77,7 +78,7 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 		tlsConfig := certManager.TLSConfig()
 		tlsConfig.GetCertificate = getSelfSignedOrLetsEncryptCert(&certManager)
 		srv = &http.Server{
-			Addr:         cfg.ServerConfig.ServerAddress,
+			Addr:         cfg.ServerAddress,
 			Handler:      r,
 			IdleTimeout:  60 * time.Second,
 			ReadTimeout:  60 * time.Second,

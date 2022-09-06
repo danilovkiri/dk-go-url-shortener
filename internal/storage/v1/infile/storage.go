@@ -24,13 +24,13 @@ var (
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
 	mu      sync.Mutex
-	Cfg     *config.StorageConfig
+	Cfg     *config.Config
 	DB      map[string]modelstorage.URLMapEntry
 	Encoder *json.Encoder
 }
 
 // InitStorage initializes a Storage object and sets its attributes.
-func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
+func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config) (*Storage, error) {
 	db := make(map[string]modelstorage.URLMapEntry)
 	st := Storage{
 		Cfg: cfg,
@@ -40,7 +40,7 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageCon
 	if err != nil {
 		log.Fatal(err)
 	}
-	// open file outside of goroutine since this operation might not finish prior to encoding operations
+	// open file outside goroutine since this operation might not finish prior to encoding operations
 	file, err := os.OpenFile(st.Cfg.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		log.Fatal(err)

@@ -6,13 +6,12 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/speps/go-hashids/v2"
-
 	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"github.com/speps/go-hashids/v2"
 )
 
 const SaltKey = "Some Hashing Key"

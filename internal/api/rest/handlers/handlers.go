@@ -14,13 +14,12 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/go-chi/chi"
-
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
+	"github.com/go-chi/chi"
 )
 
 // register counters for handlers queries
@@ -37,11 +36,11 @@ var (
 // URLHandler defines data structure handling and provides support for adding new implementations.
 type URLHandler struct {
 	processor    shortener.Processor
-	serverConfig *config.ServerConfig
+	serverConfig *config.Config
 }
 
 // InitURLHandler initializes a URLHandler object and sets its attributes.
-func InitURLHandler(processor shortener.Processor, serverConfig *config.ServerConfig) (*URLHandler, error) {
+func InitURLHandler(processor shortener.Processor, serverConfig *config.Config) (*URLHandler, error) {
 	if processor == nil {
 		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
 	}

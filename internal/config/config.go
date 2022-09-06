@@ -2,79 +2,26 @@
 package config
 
 import (
-	"bufio"
-	"encoding/json"
 	"flag"
-	"github.com/caarlos0/env/v6"
-	"log"
 	"os"
+
+	"github.com/ilyakaznacheev/cleanenv"
 )
 
-// Config handles server-related constants and parameters.
+// Config handles all constants and parameters.
 type Config struct {
-	ServerConfig  *ServerConfig
-	StorageConfig *StorageConfig
-	SecretConfig  *SecretConfig
+	ServerAddress   string `json:"server_address" env:"SERVER_ADDRESS"`
+	BaseURL         string `json:"base_url" env:"BASE_URL"`
+	EnableHTTPS     bool   `json:"enable_https" env:"ENABLE_HTTPS"`
+	FileStoragePath string `json:"file_storage_path" env:"FILE_STORAGE_PATH"`
+	DatabaseDSN     string `json:"database_dsn" env:"DATABASE_DSN"`
+	UserKey         string `env:"USER_KEY" env-default:"jds__63h3_7ds"`
 }
 
-// AppConfigJSON handles parameters passed in a configuration JSON file.
-type AppConfigJSON struct {
-	ServerAddress   string `json:"server_address,omitempty"`
-	BaseURL         string `json:"base_url,omitempty"`
-	FileStoragePath string `json:"file_storage_path,omitempty"`
-	DatabaseDSN     string `json:"database_dsn,omitempty"`
-	EnableHTTPS     bool   `json:"enable_https,omitempty"`
-}
-
-// ServerConfig defines default server-relates constants and parameters and overwrites them with environment variables.
-type ServerConfig struct {
-	ServerAddress string `env:"SERVER_ADDRESS"`
-	BaseURL       string `env:"BASE_URL"`
-	EnableHTTPS   bool   `env:"ENABLE_HTTPS"`
-}
-
-// StorageConfig retrieves file storage-related parameters from environment.
-type StorageConfig struct {
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
-}
-
-// SecretConfig retrieves a secret user key for hashing.
-type SecretConfig struct {
-	UserKey string `env:"USER_KEY" envDefault:"jds__63h3_7ds"`
-}
-
-// NewStorageConfig sets up a storage configuration.
-func NewStorageConfig() *StorageConfig {
-	cfg := StorageConfig{}
-	_ = env.Parse(&cfg)
-	return &cfg
-}
-
-// NewServerConfig sets up a server configuration.
-func NewServerConfig() *ServerConfig {
-	cfg := ServerConfig{}
-	_ = env.Parse(&cfg)
-	return &cfg
-}
-
-// NewSecretConfig sets up a secret configuration.
-func NewSecretConfig() *SecretConfig {
-	cfg := SecretConfig{}
-	_ = env.Parse(&cfg)
-	return &cfg
-}
-
-// NewDefaultConfiguration sets up a total configuration.
+// NewDefaultConfiguration initializes a configuration struct.
 func NewDefaultConfiguration() *Config {
-	serverCfg := NewServerConfig()
-	storageCfg := NewStorageConfig()
-	secretConfig := NewSecretConfig()
-	return &Config{
-		ServerConfig:  serverCfg,
-		StorageConfig: storageCfg,
-		SecretConfig:  secretConfig,
-	}
+	var cfg Config
+	return &cfg
 }
 
 // isFlagPassed checks whether the flag was set in CLI
@@ -88,86 +35,46 @@ func isFlagPassed(name string) bool {
 	return found
 }
 
-// parseAppConfig parses JSON configuration file
-func (cfg *Config) parseAppConfig(path string) (*AppConfigJSON, error) {
-	configFile, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func(configFile *os.File) {
-		err1 := configFile.Close()
-		if err1 != nil {
-			log.Fatalf("Could not close file: %s", err1)
-		}
-	}(configFile)
-	reader := bufio.NewReader(configFile)
-	fi, _ := configFile.Stat()
-	var appConfigBytes = make([]byte, fi.Size())
-	_, _ = reader.Read(appConfigBytes)
-	var appConfig AppConfigJSON
-	err = json.Unmarshal(appConfigBytes, &appConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &appConfig, nil
-}
-
-// redefineConfig implements prioritization logic over app parameters
-func (cfg *Config) redefineConfig(a, b, f, d, c *string, s *bool) {
+func (cfg *Config) assignValues(a, b, f, d, c *string, s *bool) error {
 	// priority: flag -> env -> json config -> default flag
-	// note that env parsing precedes flag parsing and JSON parsing
+	var err error
 	if *c != "" {
-		jsonConfig, err := cfg.parseAppConfig(*c)
-		if err != nil {
-			log.Fatalf("%s configuration file could not be processed: %s", *c, err)
-		}
-		if cfg.ServerConfig.ServerAddress == "" && jsonConfig.ServerAddress != "" {
-			cfg.ServerConfig.ServerAddress = jsonConfig.ServerAddress
-		}
-		if cfg.ServerConfig.BaseURL == "" && jsonConfig.BaseURL != "" {
-			cfg.ServerConfig.BaseURL = jsonConfig.BaseURL
-		}
-		if cfg.ServerConfig.ServerAddress == "" && jsonConfig.ServerAddress != "" {
-			cfg.ServerConfig.ServerAddress = jsonConfig.ServerAddress
-		}
-		if cfg.StorageConfig.FileStoragePath == "" && jsonConfig.FileStoragePath != "" {
-			cfg.StorageConfig.FileStoragePath = jsonConfig.FileStoragePath
-		}
-		if cfg.StorageConfig.DatabaseDSN == "" && jsonConfig.DatabaseDSN != "" {
-			cfg.StorageConfig.DatabaseDSN = jsonConfig.DatabaseDSN
-		}
-		if !cfg.ServerConfig.EnableHTTPS && jsonConfig.EnableHTTPS {
-			cfg.ServerConfig.EnableHTTPS = jsonConfig.EnableHTTPS
-		}
+		err = cleanenv.ReadConfig(*c, cfg)
+	} else {
+		err = cleanenv.ReadEnv(cfg)
 	}
-
-	if isFlagPassed("a") || cfg.ServerConfig.ServerAddress == "" {
-		cfg.ServerConfig.ServerAddress = *a
+	// return err here to stop code execution
+	if err != nil {
+		return err
 	}
-	if isFlagPassed("b") || cfg.ServerConfig.BaseURL == "" {
-		cfg.ServerConfig.BaseURL = *b
+	if isFlagPassed("a") || cfg.ServerAddress == "" {
+		cfg.ServerAddress = *a
 	}
-	if isFlagPassed("f") || cfg.StorageConfig.FileStoragePath == "" {
-		cfg.StorageConfig.FileStoragePath = *f
+	if isFlagPassed("b") || cfg.BaseURL == "" {
+		cfg.BaseURL = *b
 	}
-	if isFlagPassed("d") || cfg.StorageConfig.DatabaseDSN == "" {
-		cfg.StorageConfig.DatabaseDSN = *d
+	if isFlagPassed("f") || cfg.FileStoragePath == "" {
+		cfg.FileStoragePath = *f
 	}
-	if isFlagPassed("s") || !cfg.ServerConfig.EnableHTTPS {
-		cfg.ServerConfig.EnableHTTPS = *s
+	if isFlagPassed("d") || cfg.DatabaseDSN == "" {
+		cfg.DatabaseDSN = *d
 	}
+	if isFlagPassed("s") || !cfg.EnableHTTPS {
+		cfg.EnableHTTPS = *s
+	}
+	return nil
 }
 
-// ParseFlags parses command line arguments and stores them
-func (cfg *Config) ParseFlags() {
+// Parse parses command line arguments and environment and stores them
+func (cfg *Config) Parse() error {
 	a := flag.String("a", ":8080", "Server address")
 	b := flag.String("b", "http://localhost:8080", "Base url")
-	c := flag.String("q", os.Getenv("CONFIG"), "Configuration file path")
+	c := flag.String("c", os.Getenv("CONFIG"), "Configuration file path")
 	// DatabaseDSN scheme: "postgres://username:password@localhost:5432/database_name"
 	d := flag.String("d", "", "PSQL DB connection")
 	f := flag.String("f", "url_storage.json", "File storage path")
 	s := flag.Bool("s", false, "Use HTTPS connection")
 	flag.Parse()
-	cfg.redefineConfig(a, b, f, d, c, s)
-
+	err := cfg.assignValues(a, b, f, d, c, s)
+	return err
 }

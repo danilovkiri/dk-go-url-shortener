@@ -3,15 +3,14 @@ package shortener
 import (
 	"context"
 	"errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/mocks"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
 // Tests
@@ -19,9 +18,9 @@ import (
 func TestInitShortener(t *testing.T) {
 	cfg := config.NewDefaultConfiguration()
 	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	_, err := InitShortener(nil)
 	assert.Equal(t, "nil storage was passed to service initializer", err.Error())
 }

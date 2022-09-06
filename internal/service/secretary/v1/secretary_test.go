@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 )
 
 func randStringBytes(n int) string {
@@ -24,7 +23,7 @@ func randStringBytes(n int) string {
 // Tests
 
 func TestDecode_Fail(t *testing.T) {
-	cfg := config.NewSecretConfig()
+	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
 	secretary := NewSecretaryService(cfg)
 	var newNonce []byte
@@ -42,11 +41,11 @@ func TestDecode_Fail(t *testing.T) {
 type SecretaryTestSuite struct {
 	suite.Suite
 	secretary *Secretary
-	config    *config.SecretConfig
+	config    *config.Config
 }
 
 func (suite *SecretaryTestSuite) SetupTest() {
-	suite.config = config.NewSecretConfig()
+	suite.config = config.NewDefaultConfiguration()
 	suite.config.UserKey = "jds__63h3_7ds"
 	suite.secretary = NewSecretaryService(suite.config)
 }
@@ -131,7 +130,7 @@ func (suite *SecretaryTestSuite) TestDecode() {
 // Benchmarks
 
 func BenchmarkNewSecretaryService(b *testing.B) {
-	cfg := config.NewSecretConfig()
+	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -140,7 +139,7 @@ func BenchmarkNewSecretaryService(b *testing.B) {
 }
 
 func BenchmarkSecretary_Encode(b *testing.B) {
-	cfg := config.NewSecretConfig()
+	cfg := config.NewDefaultConfiguration()
 	sec := NewSecretaryService(cfg)
 	rand.Seed(time.Now().UnixNano())
 	b.ResetTimer()
@@ -153,7 +152,7 @@ func BenchmarkSecretary_Encode(b *testing.B) {
 }
 
 func BenchmarkSecretary_Decode(b *testing.B) {
-	cfg := config.NewSecretConfig()
+	cfg := config.NewDefaultConfiguration()
 	sec := NewSecretaryService(cfg)
 	rand.Seed(time.Now().UnixNano())
 	b.ResetTimer()
