@@ -5,9 +5,6 @@ type (
 	ServiceInitHashError struct {
 		Msg string
 	}
-	ServiceEncodingHashError struct {
-		Msg string
-	}
 	ServiceFoundNilStorage struct {
 		Msg string
 	}
@@ -20,10 +17,6 @@ type (
 )
 
 func (e *ServiceInitHashError) Error() string {
-	return e.Msg
-}
-
-func (e *ServiceEncodingHashError) Error() string {
 	return e.Msg
 }
 

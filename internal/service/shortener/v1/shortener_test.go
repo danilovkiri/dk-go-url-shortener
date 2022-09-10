@@ -2,17 +2,28 @@ package shortener
 
 import (
 	"context"
+	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/mocks"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 )
 
 // Tests
+
+func TestInitShortener(t *testing.T) {
+	cfg := config.NewDefaultConfiguration()
+	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
+	_, err := InitShortener(nil)
+	assert.Equal(t, "nil storage was passed to service initializer", err.Error())
+}
 
 func TestPingDB(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -21,6 +32,17 @@ func TestPingDB(t *testing.T) {
 	s.EXPECT().PingDB().Return(nil)
 	processor, _ := InitShortener(s)
 	processor.PingDB()
+}
+
+func TestDecodeByUserID_Fail(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s := mocks.NewMockURLStorage(ctrl)
+	userID := "someUserID"
+	s.EXPECT().RetrieveByUserID(context.Background(), userID).Return(nil, errors.New("generic error"))
+	processor, _ := InitShortener(s)
+	_, err := processor.DecodeByUserID(context.Background(), userID)
+	assert.Equal(t, errors.New("generic error"), err)
 }
 
 func TestDecodeByUserID(t *testing.T) {
@@ -57,6 +79,17 @@ func TestDelete(t *testing.T) {
 	processor.Delete(context.Background(), sURLs, userID)
 }
 
+func TestDecode_Fail(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s := mocks.NewMockURLStorage(ctrl)
+	sURL := "someShortURL"
+	s.EXPECT().Retrieve(context.Background(), sURL).Return("", errors.New("generic error"))
+	processor, _ := InitShortener(s)
+	_, err := processor.Decode(context.Background(), sURL)
+	assert.Equal(t, errors.New("generic error"), err)
+}
+
 func TestDecode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -67,6 +100,28 @@ func TestDecode(t *testing.T) {
 	processor, _ := InitShortener(s)
 	res, _ := processor.Decode(context.Background(), sURL)
 	assert.Equal(t, URL, res)
+}
+func TestEncode_Fail1(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s := mocks.NewMockURLStorage(ctrl)
+	URL := "some_invalid_URL"
+	userID := "someUserID"
+	processor, _ := InitShortener(s)
+	_, err := processor.Encode(context.Background(), URL, userID)
+	assert.Equal(t, "parse \"some_invalid_URL\": invalid URI for request", err.Error())
+}
+
+func TestEncode_Fail2(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s := mocks.NewMockURLStorage(ctrl)
+	URL := "https://www.some-url.com"
+	userID := "someUserID"
+	s.EXPECT().Dump(context.Background(), URL, gomock.Any(), userID).Return(errors.New("generic error"))
+	processor, _ := InitShortener(s)
+	_, err := processor.Encode(context.Background(), URL, userID)
+	assert.Equal(t, errors.New("generic error"), err)
 }
 
 func TestEncode(t *testing.T) {

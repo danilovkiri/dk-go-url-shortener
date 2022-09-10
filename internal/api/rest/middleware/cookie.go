@@ -5,24 +5,23 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/google/uuid"
-
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary"
+	"github.com/google/uuid"
 )
 
 // CookieHandler sets object structure.
 type CookieHandler struct {
 	sec secretary.Secretary
-	cfg *config.SecretConfig
+	cfg *config.Config
 }
 
 // UserCookieKey sets a cookie key to be used in user identification.
 const UserCookieKey = "user"
 
 // NewCookieHandler initializes a new cookie handler.
-func NewCookieHandler(sec secretary.Secretary, cfg *config.SecretConfig) (*CookieHandler, error) {
+func NewCookieHandler(sec secretary.Secretary, cfg *config.Config) (*CookieHandler, error) {
 	if sec == nil {
 		return nil, &serviceErrors.ServiceFoundNilStorage{Msg: "nil secretary was passed to service initializer"}
 	}
@@ -46,8 +45,6 @@ func (c *CookieHandler) CookieHandle(next http.Handler) http.Handler {
 			}
 			http.SetCookie(w, newCookie)
 			r.AddCookie(newCookie)
-		} else if err != nil {
-			http.Error(w, "Cookie crumbled", http.StatusInternalServerError)
 		} else {
 			_, err := c.sec.Decode(cookie.Value)
 			if err != nil {

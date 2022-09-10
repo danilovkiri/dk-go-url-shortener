@@ -23,21 +23,15 @@ type Secretary struct {
 }
 
 // NewSecretaryService initializes a secretary service with ciphering functionality.
-func NewSecretaryService(c *config.SecretConfig) (*Secretary, error) {
+func NewSecretaryService(c *config.Config) *Secretary {
 	key := sha256.Sum256([]byte(c.UserKey))
-	aesblock, err := aes.NewCipher(key[:])
-	if err != nil {
-		return nil, err
-	}
-	aesgcm, err := cipher.NewGCM(aesblock)
-	if err != nil {
-		return nil, err
-	}
+	aesblock, _ := aes.NewCipher(key[:])
+	aesgcm, _ := cipher.NewGCM(aesblock)
 	nonce := key[len(key)-aesgcm.NonceSize():]
 	return &Secretary{
 		aesgcm: aesgcm,
 		nonce:  nonce,
-	}, nil
+	}
 }
 
 // Encode ciphers data using the previously established cipher.

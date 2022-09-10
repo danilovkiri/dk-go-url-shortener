@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	"github.com/danilovkiri/dk_go_url_shortener/cmd/staticlint/customanalyzer"
 	"github.com/gostaticanalysis/sqlrows/passes/sqlrows"
 	"github.com/reillywatson/lintservemux"
@@ -25,7 +27,6 @@ import (
 	"golang.org/x/tools/go/analysis/passes/unusedresult"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"honnef.co/go/tools/staticcheck"
-	"strings"
 )
 
 func main() {
@@ -53,8 +54,8 @@ func main() {
 	// staticChecks contains selected "honnef.co/go/tools/staticcheck" analyzers
 	var staticChecks []*analysis.Analyzer
 	for _, v := range staticcheck.Analyzers {
-		if strings.HasPrefix(v.Name, "SA") || strings.HasPrefix(v.Name, "ST") {
-			staticChecks = append(staticChecks, v)
+		if strings.HasPrefix(v.Analyzer.Name, "SA") || strings.HasPrefix(v.Analyzer.Name, "ST") {
+			staticChecks = append(staticChecks, v.Analyzer)
 		}
 	}
 	// publicChecks contains selected publicly available analyzers

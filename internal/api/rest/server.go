@@ -3,11 +3,14 @@ package rest
 
 import (
 	"context"
+	"crypto/tls"
+	"expvar"
+	"log"
 	"net/http"
+	"path/filepath"
 	"time"
 
-	"github.com/go-chi/chi"
-	chiMiddleware "github.com/go-chi/chi/middleware"
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/handlers"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
@@ -15,7 +18,18 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
+	"github.com/go-chi/chi"
+	chiMiddleware "github.com/go-chi/chi/middleware"
 )
+
+var (
+	serverStart = time.Now()
+)
+
+// uptime returns time in seconds since the server start-up.
+func uptime() interface{} {
+	return int64(time.Since(serverStart).Seconds())
+}
 
 // InitServer returns a http.Server object ready to be listening and serving .
 func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStorage) (server *http.Server, err error) {
@@ -23,15 +37,12 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	if err != nil {
 		return nil, err
 	}
-	urlHandler, err := handlers.InitURLHandler(shortenerService, cfg.ServerConfig)
+	urlHandler, err := handlers.InitURLHandler(shortenerService, cfg)
 	if err != nil {
 		return nil, err
 	}
-	secretaryService, err := secretary.NewSecretaryService(cfg.SecretConfig)
-	if err != nil {
-		return nil, err
-	}
-	cookieHandler, err := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, err := middleware.NewCookieHandler(secretaryService, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -46,15 +57,54 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	r.Get("/ping", urlHandler.HandlePingDB())
-	r.Mount("/debug", chiMiddleware.Profiler())
+	r.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
+	expvar.Publish("system.uptime", expvar.Func(uptime))
 
-	srv := &http.Server{
-		Addr: cfg.ServerConfig.ServerAddress,
-		//Handler:      http.TimeoutHandler(r, 500*time.Millisecond, "Timeout reached"),
-		Handler:      r,
-		IdleTimeout:  60 * time.Second,
-		ReadTimeout:  60 * time.Second,
-		WriteTimeout: 60 * time.Second,
+	var srv *http.Server
+	if !cfg.EnableHTTPS {
+		srv = &http.Server{
+			Addr:         cfg.ServerAddress,
+			Handler:      r,
+			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  60 * time.Second,
+			WriteTimeout: 60 * time.Second,
+		}
+	} else {
+		certManager := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("localhost"), // to be changed to real value
+			Cache:      autocert.DirCache("../../certs"),
+		}
+		tlsConfig := certManager.TLSConfig()
+		tlsConfig.GetCertificate = getSelfSignedOrLetsEncryptCert(&certManager)
+		srv = &http.Server{
+			Addr:         cfg.ServerAddress,
+			Handler:      r,
+			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  60 * time.Second,
+			WriteTimeout: 60 * time.Second,
+			TLSConfig:    tlsConfig,
+		}
 	}
+
 	return srv, nil
+}
+
+// getSelfSignedOrLetsEncryptCert implements fallback for certificate usage in case autocert fails
+func getSelfSignedOrLetsEncryptCert(certManager *autocert.Manager) func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		dirCache, ok := certManager.Cache.(autocert.DirCache)
+		if !ok {
+			dirCache = "../../certs"
+		}
+		keyFile := filepath.Join(string(dirCache), hello.ServerName+".key")
+		crtFile := filepath.Join(string(dirCache), hello.ServerName+".crt")
+		certificate, err := tls.LoadX509KeyPair(crtFile, keyFile)
+		if err != nil {
+			log.Printf("%s\nFalling back to Letsencrypt\n", err)
+			return certManager.GetCertificate(hello)
+		}
+		log.Println("Loading self-signed certificate.")
+		return &certificate, err
+	}
 }

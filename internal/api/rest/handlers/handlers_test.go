@@ -11,12 +11,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/go-chi/chi"
-	"github.com/go-resty/resty/v2"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
@@ -25,6 +19,11 @@ import (
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
+	"github.com/go-chi/chi"
+	"github.com/go-resty/resty/v2"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
 func randStringBytes(n int) string {
@@ -37,6 +36,16 @@ func randStringBytes(n int) string {
 }
 
 // Tests
+
+func TestInitURLHandler_Fail(t *testing.T) {
+	cfg := config.NewDefaultConfiguration()
+	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
+	_, err := InitURLHandler(nil, cfg)
+	assert.Equal(t, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer"), err)
+}
 
 type HandlersTestSuite struct {
 	suite.Suite
@@ -53,21 +62,21 @@ type HandlersTestSuite struct {
 }
 
 func (suite *HandlersTestSuite) SetupTest() {
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// necessary to set default parameters here since they are set in cfg.ParseFlags() which causes error
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// parsing flags causes flag redefined errors
 	//cfg.ParseFlags()
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.wg = &sync.WaitGroup{}
 	suite.wg.Add(1)
-	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg.StorageConfig)
+	suite.storage, _ = infile.InitStorage(suite.ctx, suite.wg, cfg)
 	suite.shortenerService, _ = shortener.InitShortener(suite.storage)
-	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg.ServerConfig)
-	suite.secretaryService, _ = secretary.NewSecretaryService(cfg.SecretConfig)
-	suite.cookieHandler, _ = middleware.NewCookieHandler(suite.secretaryService, cfg.SecretConfig)
+	suite.urlHandler, _ = InitURLHandler(suite.shortenerService, cfg)
+	suite.secretaryService = secretary.NewSecretaryService(cfg)
+	suite.cookieHandler, _ = middleware.NewCookieHandler(suite.secretaryService, cfg)
 	suite.router = chi.NewRouter()
 	suite.ts = httptest.NewServer(suite.router)
 }
@@ -102,6 +111,13 @@ func (suite *HandlersTestSuite) TestHandleGetURL() {
 			sURL: "",
 			want: want{
 				code: 404,
+			},
+		},
+		{
+			name: "Absent GET query",
+			sURL: "some_absent_sURL",
+			want: want{
+				code: 400,
 			},
 		},
 	}
@@ -289,6 +305,7 @@ func (suite *HandlersTestSuite) TestHandleGetURLsByUserID() {
 			})
 			res, err := client.R().Get(suite.ts.URL + "/api/user/urls")
 			if err != nil {
+				t.Log(err)
 				t.Fatalf("Could not perform GET by userID request")
 			}
 			assert.Equal(t, tt.want.code, res.StatusCode())
@@ -419,33 +436,33 @@ func (suite *HandlersTestSuite) TestHandlePingDB() {
 // Benchmarks
 
 func BenchmarkInitURLHandler(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = InitURLHandler(svc, cfg.ServerConfig)
+		_, _ = InitURLHandler(svc, cfg)
 	}
 }
 
 func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -463,18 +480,18 @@ func BenchmarkURLHandler_HandleGetURL(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -495,18 +512,18 @@ func BenchmarkURLHandler_HandleGetURLsByUserID(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -521,18 +538,18 @@ func BenchmarkURLHandler_HandlePostURL(b *testing.B) {
 }
 
 func BenchmarkURLHandler_JSONHandlePostURL(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -559,18 +576,18 @@ func BenchmarkURLHandler_JSONHandlePostURL(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandlePingDB(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -587,18 +604,18 @@ func BenchmarkURLHandler_HandlePingDB(b *testing.B) {
 }
 
 func BenchmarkURLHandler_JSONHandlePostURLBatch(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -631,18 +648,18 @@ func BenchmarkURLHandler_JSONHandlePostURLBatch(b *testing.B) {
 }
 
 func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
-	cfg, _ := config.NewDefaultConfiguration()
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg := config.NewDefaultConfiguration()
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	svc, _ := shortener.InitShortener(strg)
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
+	secretaryService := secretary.NewSecretaryService(cfg)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -669,23 +686,23 @@ func BenchmarkURLHandler_HandleDeleteURLBatch(b *testing.B) {
 
 func ExampleInitURLHandler() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Set any available endpoint handler to any custom endpoint
@@ -697,29 +714,29 @@ func ExampleInitURLHandler() {
 
 func ExampleURLHandler_HandleGetURL() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	//// Initialize cookie handler
-	//cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	//cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -745,29 +762,29 @@ func ExampleURLHandler_HandleGetURL() {
 
 func ExampleURLHandler_HandlePostURL() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	// Initialize cookie handler
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -791,29 +808,29 @@ func ExampleURLHandler_HandlePostURL() {
 
 func ExampleURLHandler_JSONHandlePostURL() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	// Initialize cookie handler
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -841,29 +858,29 @@ func ExampleURLHandler_JSONHandlePostURL() {
 
 func ExampleURLHandler_JSONHandlePostURLBatch() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	// Initialize cookie handler
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -898,29 +915,29 @@ func ExampleURLHandler_JSONHandlePostURLBatch() {
 
 func ExampleURLHandler_HandleDeleteURLBatch() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	// Initialize cookie handler
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -946,29 +963,29 @@ func ExampleURLHandler_HandleDeleteURLBatch() {
 
 func ExampleURLHandler_HandleGetURLsByUserID() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	// Initialize cookie handler
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()
@@ -998,29 +1015,29 @@ func ExampleURLHandler_HandleGetURLsByUserID() {
 
 func ExampleURLHandler_HandlePingDB() {
 	// Parse environment
-	cfg, _ := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
 	// Parse CLI-defined flags and arguments in a MWE, not in tests
 	//cfg.ParseFlags()
 	// Set parameters explicitly for error-prone example running
-	cfg.ServerConfig.ServerAddress = ":8080"
-	cfg.ServerConfig.BaseURL = "http://localhost:8080"
-	cfg.StorageConfig.FileStoragePath = "url_storage.json"
+	cfg.ServerAddress = ":8080"
+	cfg.BaseURL = "http://localhost:8080"
+	cfg.FileStoragePath = "url_storage.json"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	// Initialize storage
-	strg, _ := infile.InitStorage(ctx, wg, cfg.StorageConfig)
+	strg, _ := infile.InitStorage(ctx, wg, cfg)
 	// Initialize shortener service
 	svc, _ := shortener.InitShortener(strg)
 	// Initialize URL handler
-	urlHandler, _ := InitURLHandler(svc, cfg.ServerConfig)
+	urlHandler, _ := InitURLHandler(svc, cfg)
 	// Initialize router
 	router := chi.NewRouter()
 	// Initialize secretary service
-	secretaryService, _ := secretary.NewSecretaryService(cfg.SecretConfig)
+	secretaryService := secretary.NewSecretaryService(cfg)
 	// Initialize cookie handler
-	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg.SecretConfig)
+	cookieHandler, _ := middleware.NewCookieHandler(secretaryService, cfg)
 	// Initialize server
 	ts := httptest.NewServer(router)
 	defer ts.Close()

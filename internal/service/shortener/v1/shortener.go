@@ -6,13 +6,12 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/speps/go-hashids/v2"
-
 	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"github.com/speps/go-hashids/v2"
 )
 
 const SaltKey = "Some Hashing Key"
@@ -58,10 +57,7 @@ func (short *Shortener) Encode(ctx context.Context, URL string, userID string) (
 	if err != nil {
 		return "", &serviceErrors.ServiceIncorrectInputURL{Msg: err.Error()}
 	}
-	sURL, err = short.generateSlug()
-	if err != nil {
-		return "", &serviceErrors.ServiceEncodingHashError{Msg: err.Error()}
-	}
+	sURL = short.generateSlug()
 	err = short.URLStorage.Dump(ctx, URL, sURL, userID)
 	if err != nil {
 		return "", err
@@ -101,8 +97,8 @@ func (short *Shortener) PingDB() error {
 }
 
 // generateSlug generates and returns a short unique identifier for a string.
-func (short *Shortener) generateSlug() (slug string, err error) {
+func (short *Shortener) generateSlug() (slug string) {
 	now := time.Now().UnixNano()
-	slug, err = short.hashID.Encode([]int{int(now)})
-	return slug, err
+	slug, _ = short.hashID.Encode([]int{int(now)})
+	return slug
 }

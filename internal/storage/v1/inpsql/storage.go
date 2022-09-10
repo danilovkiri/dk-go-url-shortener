@@ -9,16 +9,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
-	_ "github.com/jackc/pgx/v4/stdlib"
-	"github.com/lib/pq"
-
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/modelurl"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/modelstorage"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
+	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/lib/pq"
 )
 
 // Flush flushes URL entries from buffer and sends them for deletion.
@@ -48,13 +47,13 @@ var (
 // Storage struct defines data structure handling and provides support for adding new implementations.
 type Storage struct {
 	mu  sync.Mutex
-	Cfg *config.StorageConfig
+	Cfg *config.Config
 	DB  *sql.DB
 	ch  chan modelstorage.URLChannelEntry
 }
 
 // InitStorage initializes a Storage object and sets its attributes.
-func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.StorageConfig) (*Storage, error) {
+func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config) (*Storage, error) {
 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
 		log.Fatal(err)

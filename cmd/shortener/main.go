@@ -63,19 +63,19 @@ func main() {
 	// set number of wg members to 1 (this will be the persistStorage goroutine)
 	wg.Add(1)
 	// get configuration
-	cfg, err := config.NewDefaultConfiguration()
+	cfg := config.NewDefaultConfiguration()
+	err = cfg.Parse()
 	if err != nil {
 		mainlog.Fatal(err)
 	}
-	cfg.ParseFlags()
 	// initialize (or retrieve if present) storage, switch between "infile" and "inpsql" modules
 	var errInit error
 	var storageInit storage.URLStorage
-	switch cfg.StorageConfig.DatabaseDSN {
+	switch cfg.DatabaseDSN {
 	case "":
-		storageInit, errInit = infile.InitStorage(ctx, wg, cfg.StorageConfig)
+		storageInit, errInit = infile.InitStorage(ctx, wg, cfg)
 	default:
-		storageInit, errInit = inpsql.InitStorage(ctx, wg, cfg.StorageConfig)
+		storageInit, errInit = inpsql.InitStorage(ctx, wg, cfg)
 	}
 	if errInit != nil {
 		mainlog.Fatal(errInit)
@@ -87,7 +87,7 @@ func main() {
 	}
 	// set a listener for os.Signal
 	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-done
 		mainlog.Print("Server shutdown attempted")
@@ -100,8 +100,16 @@ func main() {
 	}()
 	// start up the server
 	mainlog.Print("Server start attempted")
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		mainlog.Fatal(err)
+	if !cfg.EnableHTTPS {
+		mainlog.Print("Using HTTP")
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			mainlog.Fatal(err)
+		}
+	} else {
+		mainlog.Print("Using HTTPS")
+		if err := server.ListenAndServeTLS("../../certs/localhost.crt", "../../certs/localhost.key"); err != nil && err != http.ErrServerClosed {
+			mainlog.Fatal(err)
+		}
 	}
 	// wait for goroutine in InitStorage to finish before exiting
 	wg.Wait()
