@@ -16,6 +16,7 @@ type Config struct {
 	FileStoragePath string `json:"file_storage_path" env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `json:"database_dsn" env:"DATABASE_DSN"`
 	UserKey         string `env:"USER_KEY" env-default:"jds__63h3_7ds"`
+	TrustedSubnet   string `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
 }
 
 // NewDefaultConfiguration initializes a configuration struct.
@@ -35,7 +36,7 @@ func isFlagPassed(name string) bool {
 	return found
 }
 
-func (cfg *Config) assignValues(a, b, f, d, c *string, s *bool) error {
+func (cfg *Config) assignValues(a, b, f, d, c, t *string, s *bool) error {
 	// priority: flag -> env -> json config -> default flag
 	var err error
 	if *c != "" {
@@ -59,6 +60,9 @@ func (cfg *Config) assignValues(a, b, f, d, c *string, s *bool) error {
 	if isFlagPassed("d") || cfg.DatabaseDSN == "" {
 		cfg.DatabaseDSN = *d
 	}
+	if isFlagPassed("t") || cfg.TrustedSubnet == "" {
+		cfg.TrustedSubnet = *t
+	}
 	if isFlagPassed("s") || !cfg.EnableHTTPS {
 		cfg.EnableHTTPS = *s
 	}
@@ -74,7 +78,8 @@ func (cfg *Config) Parse() error {
 	d := flag.String("d", "", "PSQL DB connection")
 	f := flag.String("f", "url_storage.json", "File storage path")
 	s := flag.Bool("s", false, "Use HTTPS connection")
+	t := flag.String("t", "", "Trusted subnet")
 	flag.Parse()
-	err := cfg.assignValues(a, b, f, d, c, s)
+	err := cfg.assignValues(a, b, f, d, c, t, s)
 	return err
 }

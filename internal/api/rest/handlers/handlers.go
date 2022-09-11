@@ -47,6 +47,44 @@ func InitURLHandler(processor shortener.Processor, serverConfig *config.Config) 
 	return &URLHandler{processor: processor, serverConfig: serverConfig}, nil
 }
 
+// HandleGetStats provides client with statistics on URLs and clients.
+func (h *URLHandler) HandleGetStats() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+		nURLs, nUsers, err := h.processor.GetStats(ctx)
+		if err != nil {
+			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			if errors.As(err, &contextTimeoutExceededError) {
+				log.Println("HandleGetStats:", err)
+				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
+			}
+			log.Println("HandleGetStats:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		responseStats := modeldto.ResponseStats{
+			URLs:  nURLs,
+			Users: nUsers,
+		}
+		resBody, err := json.Marshal(responseStats)
+		if err != nil {
+			log.Println("HandleGetStats:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// set and send response body
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(resBody)
+		if err != nil {
+			log.Println("HandleGetStats:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+}
+
 // HandleGetURL provides client with a redirect to the original URL accessed by shortened URL.
 func (h *URLHandler) HandleGetURL() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -472,6 +510,5 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write(resBody)
-
 	}
 }

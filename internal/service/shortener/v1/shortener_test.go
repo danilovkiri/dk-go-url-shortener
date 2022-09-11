@@ -25,7 +25,31 @@ func TestInitShortener(t *testing.T) {
 	assert.Equal(t, "nil storage was passed to service initializer", err.Error())
 }
 
-func TestPingDB(t *testing.T) {
+func TestShortener_GetStats_Fail(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s := mocks.NewMockURLStorage(ctrl)
+	s.EXPECT().GetStats(context.Background()).Return(0, 0, errors.New("generic error"))
+	processor, _ := InitShortener(s)
+	URLs, users, err := processor.GetStats(context.Background())
+	assert.Equal(t, URLs, 0)
+	assert.Equal(t, users, 0)
+	assert.Equal(t, err, errors.New("generic error"))
+}
+
+func TestShortener_GetStats(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	s := mocks.NewMockURLStorage(ctrl)
+	s.EXPECT().GetStats(context.Background()).Return(10, 12, nil)
+	processor, _ := InitShortener(s)
+	URLs, users, err := processor.GetStats(context.Background())
+	assert.Equal(t, URLs, 10)
+	assert.Equal(t, users, 12)
+	assert.Equal(t, err, nil)
+}
+
+func TestShortener_PingDB(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -34,7 +58,7 @@ func TestPingDB(t *testing.T) {
 	processor.PingDB()
 }
 
-func TestDecodeByUserID_Fail(t *testing.T) {
+func TestShortener_DecodeByUserID_Fail(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -45,7 +69,7 @@ func TestDecodeByUserID_Fail(t *testing.T) {
 	assert.Equal(t, errors.New("generic error"), err)
 }
 
-func TestDecodeByUserID(t *testing.T) {
+func TestShortener_DecodeByUserID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -66,7 +90,7 @@ func TestDecodeByUserID(t *testing.T) {
 	assert.Equal(t, URLs, res)
 }
 
-func TestDelete(t *testing.T) {
+func TestShortener_Delete(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -79,7 +103,7 @@ func TestDelete(t *testing.T) {
 	processor.Delete(context.Background(), sURLs, userID)
 }
 
-func TestDecode_Fail(t *testing.T) {
+func TestShortener_Decode_Fail(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -90,7 +114,7 @@ func TestDecode_Fail(t *testing.T) {
 	assert.Equal(t, errors.New("generic error"), err)
 }
 
-func TestDecode(t *testing.T) {
+func TestShortener_Decode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -101,7 +125,7 @@ func TestDecode(t *testing.T) {
 	res, _ := processor.Decode(context.Background(), sURL)
 	assert.Equal(t, URL, res)
 }
-func TestEncode_Fail1(t *testing.T) {
+func TestShortener_Encode_Fail1(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -112,7 +136,7 @@ func TestEncode_Fail1(t *testing.T) {
 	assert.Equal(t, "parse \"some_invalid_URL\": invalid URI for request", err.Error())
 }
 
-func TestEncode_Fail2(t *testing.T) {
+func TestShortener_Encode_Fail2(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
@@ -124,7 +148,7 @@ func TestEncode_Fail2(t *testing.T) {
 	assert.Equal(t, errors.New("generic error"), err)
 }
 
-func TestEncode(t *testing.T) {
+func TestShortener_Encode(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)

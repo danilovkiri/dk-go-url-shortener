@@ -51,6 +51,15 @@ func InitShortener(s storage.URLStorage) (*Shortener, error) {
 	return shortener, nil
 }
 
+// GetStats retrieves total number of sURLs and clients from storage.
+func (short *Shortener) GetStats(ctx context.Context) (nURLs int, nUsers int, err error) {
+	nURLs, nUsers, err = short.URLStorage.GetStats(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return nURLs, nUsers, nil
+}
+
 // Encode generates a sURL, stores URL and sURL in a storage, and returns sURL.
 func (short *Shortener) Encode(ctx context.Context, URL string, userID string) (sURL string, err error) {
 	_, err = url.ParseRequestURI(URL)

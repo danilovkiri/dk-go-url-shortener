@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary"
 	"github.com/google/uuid"
 )
@@ -22,9 +21,6 @@ const UserCookieKey = "user"
 
 // NewCookieHandler initializes a new cookie handler.
 func NewCookieHandler(sec secretary.Secretary, cfg *config.Config) (*CookieHandler, error) {
-	if sec == nil {
-		return nil, &serviceErrors.ServiceFoundNilStorage{Msg: "nil secretary was passed to service initializer"}
-	}
 	return &CookieHandler{
 		sec: sec,
 		cfg: cfg,

@@ -61,6 +61,32 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config) (*
 	return &st, nil
 }
 
+func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
+	// create channels for listening to the go routine result
+	retrieveDone := make(chan []int, 1)
+	go func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		countURLs := len(s.DB)
+		uniqueUsers := map[string]bool{}
+		for _, URL := range s.DB {
+			uniqueUsers[URL.UserID] = true
+		}
+		countUsers := len(uniqueUsers)
+		retrieveDone <- []int{countURLs, countUsers}
+	}()
+
+	// wait for the first channel to retrieve a value
+	select {
+	case <-ctx.Done():
+		log.Println("Retrieving stats:", ctx.Err())
+		return 0, 0, &storageErrors.ContextTimeoutExceededError{Err: ctx.Err()}
+	case stats := <-retrieveDone:
+		log.Println("Retrieving stats: done")
+		return stats[0], stats[1], nil
+	}
+}
+
 // Retrieve returns a URL corresponding to sURL.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
 	// create channels for listening to the go routine result

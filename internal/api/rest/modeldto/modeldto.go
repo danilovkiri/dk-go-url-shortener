@@ -29,4 +29,10 @@ type (
 		CorrelationID string `json:"correlation_id"`
 		SURL          string `json:"short_url"`
 	}
+
+	// ResponseStats is used in HandleGetStats
+	ResponseStats struct {
+		URLs  int `json:"urls"`
+		Users int `json:"users"`
+	}
 )

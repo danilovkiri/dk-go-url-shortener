@@ -16,12 +16,6 @@ import (
 
 // Tests
 
-func TestNewCookieHandler_Fail(t *testing.T) {
-	cfg := config.NewDefaultConfiguration()
-	_, err := NewCookieHandler(nil, cfg)
-	assert.Equal(t, "nil secretary was passed to service initializer", err.Error())
-}
-
 func TestCookieHandleAbsentCookie(t *testing.T) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)

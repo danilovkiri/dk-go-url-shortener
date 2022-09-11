@@ -46,18 +46,23 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	if err != nil {
 		return nil, err
 	}
+	trustedNetHandler := middleware.NewTrustedNetHandler(cfg)
 	r := chi.NewRouter()
 	r.Use(cookieHandler.CookieHandle)
 	r.Use(middleware.CompressHandle)
 	r.Use(middleware.DecompressHandle)
-	r.Post("/", urlHandler.HandlePostURL())
-	r.Post("/api/shorten", urlHandler.JSONHandlePostURL())
-	r.Post("/api/shorten/batch", urlHandler.JSONHandlePostURLBatch())
-	r.Get("/{urlID}", urlHandler.HandleGetURL())
-	r.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
-	r.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
-	r.Get("/ping", urlHandler.HandlePingDB())
-	r.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
+	trustedGroup := r.Group(nil)
+	trustedGroup.Use(trustedNetHandler.TrustedNetworkHandler)
+	trustedGroup.Get("/api/internal/stats", urlHandler.HandleGetStats())
+	mainGroup := r.Group(nil)
+	mainGroup.Post("/", urlHandler.HandlePostURL())
+	mainGroup.Post("/api/shorten", urlHandler.JSONHandlePostURL())
+	mainGroup.Post("/api/shorten/batch", urlHandler.JSONHandlePostURLBatch())
+	mainGroup.Get("/{urlID}", urlHandler.HandleGetURL())
+	mainGroup.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
+	mainGroup.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
+	mainGroup.Get("/ping", urlHandler.HandlePingDB())
+	mainGroup.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
 	expvar.Publish("system.uptime", expvar.Func(uptime))
 
 	var srv *http.Server

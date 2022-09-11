@@ -128,6 +128,52 @@ func (s *Storage) SendToQueue(item modelstorage.URLChannelEntry) {
 	s.ch <- item
 }
 
+func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
+	// prepare query statement
+	countStmtURLs, err := s.DB.PrepareContext(ctx, "SELECT COUNT(DISTINCT short_url) FROM urls")
+	if err != nil {
+		return 0, 0, &storageErrors.StatementPSQLError{Err: err}
+	}
+	countStmtUsers, err := s.DB.PrepareContext(ctx, "SELECT COUNT(DISTINCT user_id) FROM urls")
+	if err != nil {
+		return 0, 0, &storageErrors.StatementPSQLError{Err: err}
+	}
+
+	// create channels for listening to the go routine result
+	retrieveDone := make(chan []int, 1)
+	retrieveError := make(chan error)
+	go func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		var countURLs int
+		var countUsers int
+		err := countStmtURLs.QueryRowContext(ctx).Scan(&countURLs)
+		if err != nil {
+			retrieveError <- &storageErrors.ExecutionPSQLError{Err: err}
+			return
+		}
+		err = countStmtUsers.QueryRowContext(ctx).Scan(&countUsers)
+		if err != nil {
+			retrieveError <- &storageErrors.ExecutionPSQLError{Err: err}
+			return
+		}
+		retrieveDone <- []int{countURLs, countUsers}
+	}()
+
+	// wait for the first channel to retrieve a value
+	select {
+	case <-ctx.Done():
+		log.Println("Retrieving stats:", ctx.Err())
+		return 0, 0, &storageErrors.ContextTimeoutExceededError{Err: ctx.Err()}
+	case rtrvError := <-retrieveError:
+		log.Println("Retrieving stats:", rtrvError.Error())
+		return 0, 0, rtrvError
+	case stats := <-retrieveDone:
+		log.Println("Retrieving stats: done")
+		return stats[0], stats[1], nil
+	}
+}
+
 // Retrieve returns a URL corresponding to sURL.
 func (s *Storage) Retrieve(ctx context.Context, sURL string) (URL string, err error) {
 	// prepare query statement

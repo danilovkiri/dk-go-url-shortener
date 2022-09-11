@@ -19,14 +19,16 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	_ = os.Setenv("BASE_URL", "some_base_url")
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	_ = os.Setenv("ENABLE_HTTPS", "false")
+	_ = os.Setenv("TRUSTED_SUBNET", "some_subnet")
 	cfg := NewDefaultConfiguration()
 	var a = ""
 	var b = ""
 	var f = ""
 	var d = ""
 	var c = ""
+	var tt = ""
 	var s = false
-	err := cfg.assignValues(&a, &b, &f, &d, &c, &s)
+	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,6 +39,7 @@ func TestNewDefaultConfiguration(t *testing.T) {
 		FileStoragePath: "some_file",
 		DatabaseDSN:     "some_dsn",
 		UserKey:         "some_user_key",
+		TrustedSubnet:   "some_subnet",
 	}
 	assert.Equal(t, &expCfg, cfg)
 }
@@ -57,6 +60,7 @@ func TestConfig_ParseFlags(t *testing.T) {
 		FileStoragePath: "url_storage.json",
 		DatabaseDSN:     "postgres://username:password@localhost:5432/database_name",
 		UserKey:         "some_user_key",
+		TrustedSubnet:   "192.168.1.0/24",
 	}
 	assert.Equal(t, &expCfg, cfg)
 }
@@ -69,8 +73,9 @@ func TestConfig_parseAppConfigPathError(t *testing.T) {
 	var f = ""
 	var d = ""
 	var c = "nonexistent_file.json"
+	var tt = ""
 	var s = false
-	err := cfg.assignValues(&a, &b, &f, &d, &c, &s)
+	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s)
 	var error *fs.PathError
 	assert.ErrorAs(t, err, &error)
 }
@@ -85,16 +90,18 @@ func BenchmarkNewDefaultConfiguration(b *testing.B) {
 	_ = os.Setenv("BASE_URL", "some_base_url")
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	_ = os.Setenv("ENABLE_HTTPS", "false")
+	_ = os.Setenv("TRUSTED_SUBNET", "some_subnet")
 	var a = ""
 	var bb = ""
 	var f = ""
 	var d = ""
 	var c = ""
+	var tt = ""
 	var s = false
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cfg := NewDefaultConfiguration()
-		err := cfg.assignValues(&a, &bb, &f, &d, &c, &s)
+		err := cfg.assignValues(&a, &bb, &f, &d, &c, &tt, &s)
 		if err != nil {
 			log.Fatal(err)
 		}

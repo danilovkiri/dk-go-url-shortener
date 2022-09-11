@@ -39,6 +39,11 @@ type Closer interface {
 	CloseDB() error
 }
 
+// Maintainer defines a set of methods for types implementing Maintainer.
+type Maintainer interface {
+	GetStats(ctx context.Context) (nURLs, nUsers int, err error)
+}
+
 // URLStorage defines a set of embedded interfaces for types implementing URLStorage.
 type URLStorage interface {
 	URLSetter
@@ -47,4 +52,5 @@ type URLStorage interface {
 	URLGetterByUserID
 	Pinger
 	Closer
+	Maintainer
 }
