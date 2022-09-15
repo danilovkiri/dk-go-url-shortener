@@ -1,12 +1,14 @@
+// Package middleware provides various middleware functionality.
 package middleware
 
 import (
 	"errors"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"log"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 )
 
 // TrustedNetHandler sets object structure.

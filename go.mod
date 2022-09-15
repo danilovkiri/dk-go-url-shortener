@@ -3,7 +3,6 @@ module github.com/danilovkiri/dk_go_url_shortener
 go 1.17
 
 require (
-	github.com/caarlos0/env/v6 v6.10.0
 	github.com/go-chi/chi v4.1.2+incompatible
 	github.com/go-resty/resty/v2 v2.7.0
 	github.com/golang/mock v1.6.0
@@ -25,6 +24,7 @@ require (
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
 	github.com/gostaticanalysis/comment v1.4.2 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect

@@ -54,6 +54,8 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	trustedGroup := r.Group(nil)
 	trustedGroup.Use(trustedNetHandler.TrustedNetworkHandler)
 	trustedGroup.Get("/api/internal/stats", urlHandler.HandleGetStats())
+	trustedGroup.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
+	expvar.Publish("system.uptime", expvar.Func(uptime))
 	mainGroup := r.Group(nil)
 	mainGroup.Post("/", urlHandler.HandlePostURL())
 	mainGroup.Post("/api/shorten", urlHandler.JSONHandlePostURL())
@@ -62,8 +64,6 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 	mainGroup.Get("/api/user/urls", urlHandler.HandleGetURLsByUserID())
 	mainGroup.Delete("/api/user/urls", urlHandler.HandleDeleteURLBatch())
 	mainGroup.Get("/ping", urlHandler.HandlePingDB())
-	mainGroup.Mount("/debug", chiMiddleware.Profiler()) // see https://github.com/go-chi/chi/blob/master/middleware/profiler.go
-	expvar.Publish("system.uptime", expvar.Func(uptime))
 
 	var srv *http.Server
 	if !cfg.EnableHTTPS {

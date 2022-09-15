@@ -1,0 +1,423 @@
+openapi: 3.1.0
+info:
+  title: Swagger URL Shortening Service - OpenAPI 3.0
+  description: |-
+    URL Shortening server supporting client authentication, persistent storage, HTTP/2 and gRPC, HTTPS and trusted networks.
+  contact:
+    email: danilovkiri@yandex.ru
+  license:
+    name: MIT
+    url: https://mit-license.org/
+  version: 0.0.1
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: URLs
+    description: Access to everything about URLs
+  - name: stats
+    description: Access to current statistics on server storage usage
+paths:
+  /{urlID}:
+    get:
+      tags:
+        - URLs
+      summary: Get a redirect to an original URL from a short URL
+      description: Retrieve original full URL in a redirect header by a short URL
+      operationId: getURL
+      parameters:
+        - in: path
+          name: urlID
+          schema:
+            type: string
+          required: true
+          description: The string representantion of a sURL to get
+      responses:
+        '307':
+          description: Successful operation
+          headers:
+            Location:
+              schema:
+                type: string
+              description: The redirect to an original URL
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '410':
+          description: URL was deleted
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '504':
+          description: Gateway timeout
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+  /:
+    post:
+      tags:
+        - URLs
+      summary: Store a URL and get corresponding sURL
+      description: Store a URL in a storage, generate its sURL and return it
+      operationId: postURL
+      requestBody:
+        description: Store a URL in a storage, generate its sURL and return it
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: 'https://www.yandex.ru'
+        required: true
+      responses:
+        '201':
+          description: Successful operation
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'http://localhost:8080/sgq5fwsd'
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '409':
+          description: URL already exists
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'http://localhost:8080/sgq5fwsd'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '504':
+          description: Gateway timeout
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+  /api/shorten:
+    post:
+      tags:
+        - URLs
+      summary: Store a URL and get corresponding sURL
+      description: Store a URL in a storage, generate its sURL and return it
+      operationId: JSONPostURL
+      requestBody:
+        description: Store a URL in a storage, generate its sURL and return it
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestURL'
+        required: true
+      responses:
+        '201':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseURL'
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '409':
+          description: URL already exists
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'http://localhost:8080/sgq5fwsd'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '504':
+          description: Gateway timeout
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+  /api/shorten/batch:
+    post:
+      tags:
+        - URLs
+      summary: Store a batch of URLs and get corresponding sURLs
+      description: Store a batch of URLs in a storage, generate its sURLs and return them
+      operationId: JSONPostURLBatch
+      requestBody:
+        description: Store a batch of URLs in a storage, generate its sURLs and return them
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestBatchURLArray'
+        required: true
+      responses:
+        '201':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResponseBatchURLArray'
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '504':
+          description: Gateway timeout
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+  /api/user/urls:
+    delete:
+      tags:
+        - URLs
+      summary: Delete URL entries for a batch of short URLs
+      description: Set a tag for deletion for all pairs of URLs and their shortened versions by short URLs
+      operationId: DeleteURLBatch
+      requestBody:
+        description: Set a tag for deletion for all pairs of URLs and their shortened versions by short URLs
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestDeleteBatchURLArray'
+        required: true
+      responses:
+        '202':
+          description: Successful operation
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+    get:
+      tags:
+        - URLs
+      summary: Get all URLs and short URLs stored for a user
+      description: Get all pairs of URLs and their shortened versions processed for a particular user
+      operationId: GetURLsByUserID
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResponseFullURL'
+        '204':
+          description: No content
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '504':
+          description: Gateway timeout
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+  /ping:
+    get:
+      tags:
+        - URLs
+      summary: Ping DB to verify/establish a connection
+      description: Ping DB to verify/establish a connection
+      operationId: pingDB
+      responses:
+        '200':
+          description: Successful operation
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+      security:
+        - urlshort_auth: []
+  /api/internal/stats:
+    get:
+      tags:
+        - stats
+      summary: Get expvar statistics on storage usage
+      description: Get expvar statistics on storage usage
+      operationId: getStats
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResponseStats'
+        '400':
+          description: Bad request
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '403':
+          description: Access is forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+        '500':
+          description: Internal server error
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: 'generic error text'
+components:
+  schemas:
+    RequestURL:
+      type: object
+      properties:
+        url:
+          type: string
+          example: "https://www.yandex.ru"
+    ResponseURL:
+      type: object
+      properties:
+        result:
+          type: string
+          example: "http://localhost:8080/dsfds64ds5f"
+    RequestBatchURL:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+          example: "some_unique_id"
+        original_url:
+          type: string
+          example: "https://www.yandex.ru"
+    RequestBatchURLArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/RequestBatchURL'
+    ResponseBatchURL:
+      type: object
+      properties:
+        correlation_id:
+          type: string
+          example: "some_unique_id"
+        short_url:
+          type: string
+          example: "http://localhost:8080/53gfj2862h"
+    ResponseBatchURLArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/ResponseBatchURL'
+    RequestDeleteBatchURL:
+      type: string
+      example: 'gs53s90sf86'
+    RequestDeleteBatchURLArray:
+      type: array
+      items:
+        $ref: '#/components/schemas/RequestDeleteBatchURL'
+    ResponseFullURL:
+      type: object
+      properties:
+        original_url:
+          type: string
+          example: "https://www.yandex.ru"
+        short_url:
+          type: string
+          example: "http://localhost:8080/53gfj2862h"
+    ResponseStats:
+      type: object
+      properties:
+        urls:
+          type: integer
+          example: 3
+        users:
+          type: integer
+          example: 2
+  securitySchemes:
+    urlshort_auth:
+      type: apiKey
+      in: cookie
+      name: user

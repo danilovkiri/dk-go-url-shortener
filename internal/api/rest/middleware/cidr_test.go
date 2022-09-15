@@ -1,14 +1,15 @@
 package middleware
 
 import (
-	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/go-chi/chi"
-	"github.com/go-resty/resty/v2"
-	"github.com/stretchr/testify/assert"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/go-chi/chi"
+	"github.com/go-resty/resty/v2"
+	"github.com/stretchr/testify/assert"
 )
 
 // Tests

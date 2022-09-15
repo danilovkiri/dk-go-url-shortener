@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package demo;
+
+option go_package = "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto/proto";
