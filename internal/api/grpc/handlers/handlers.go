@@ -171,7 +171,7 @@ func (h *GRPCHandler) HandlePostURLBatch(ctx context.Context, request *pb.PostUR
 			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 			var alreadyExistsError *storageErrors.AlreadyExistsError
 			if errors.As(err1, &contextTimeoutExceededError) {
-				return nil, status.Error(codes.DeadlineExceeded, err.Error())
+				return nil, status.Error(codes.DeadlineExceeded, err1.Error())
 			} else if errors.As(err1, &alreadyExistsError) {
 				sURL = alreadyExistsError.ValidSURL
 				u.Path = sURL
@@ -182,7 +182,7 @@ func (h *GRPCHandler) HandlePostURLBatch(ctx context.Context, request *pb.PostUR
 				response.ResponseUrls = append(response.ResponseUrls, &responseBatchURL)
 				continue
 			}
-			return nil, status.Error(codes.Internal, err.Error())
+			return nil, status.Error(codes.Internal, err1.Error())
 		}
 		u.Path = sURL
 		responseBatchURL := pb.PostURLBatch{
@@ -203,9 +203,7 @@ func (h *GRPCHandler) HandleDeleteURLBatch(ctx context.Context, request *pb.Dele
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	deleteURLs := make([]string, 0)
-	for _, requestURL := range request.RequestUrls.Urls {
-		deleteURLs = append(deleteURLs, requestURL)
-	}
+	deleteURLs = append(deleteURLs, request.RequestUrls.Urls...)
 	h.processor.Delete(ctx, deleteURLs, userID)
 	var response pb.DeleteURLBatchResponse
 	return &response, nil
