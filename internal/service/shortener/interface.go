@@ -9,7 +9,7 @@ import (
 
 // Processor defines a set of methods for types implementing Processor.
 type Processor interface {
-	GetStats(ctx context.Context) (nURLs int, nUsers int, err error)
+	GetStats(ctx context.Context) (nURLs, nUsers int64, err error)
 	Encode(ctx context.Context, URL, userID string) (sURL string, err error)
 	Decode(ctx context.Context, sURL string) (URL string, err error)
 	Delete(ctx context.Context, sURLs []string, userID string)

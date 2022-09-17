@@ -128,7 +128,7 @@ func (s *Storage) SendToQueue(item modelstorage.URLChannelEntry) {
 	s.ch <- item
 }
 
-func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
+func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int64, err error) {
 	// prepare query statement
 	countStmtURLs, err := s.DB.PrepareContext(ctx, "SELECT COUNT(DISTINCT short_url) FROM urls")
 	if err != nil {
@@ -140,13 +140,13 @@ func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
 	}
 
 	// create channels for listening to the go routine result
-	retrieveDone := make(chan []int, 1)
+	retrieveDone := make(chan []int64, 1)
 	retrieveError := make(chan error)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		var countURLs int
-		var countUsers int
+		var countURLs int64
+		var countUsers int64
 		err := countStmtURLs.QueryRowContext(ctx).Scan(&countURLs)
 		if err != nil {
 			retrieveError <- &storageErrors.ExecutionPSQLError{Err: err}
@@ -157,7 +157,7 @@ func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
 			retrieveError <- &storageErrors.ExecutionPSQLError{Err: err}
 			return
 		}
-		retrieveDone <- []int{countURLs, countUsers}
+		retrieveDone <- []int64{countURLs, countUsers}
 	}()
 
 	// wait for the first channel to retrieve a value

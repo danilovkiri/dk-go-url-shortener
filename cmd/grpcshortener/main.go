@@ -3,19 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
-	"time"
-
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest"
+	api_grpc "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc"
+	pb "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/inpsql"
+	"google.golang.org/grpc"
+	"log"
+	"net"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 )
 
 var (
@@ -55,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer flog.Close()
-	mainlog := log.New(flog, `http `, log.LstdFlags|log.Lshortfile)
+	mainlog := log.New(flog, `grpc `, log.LstdFlags|log.Lshortfile)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// add a waiting group
@@ -81,8 +81,21 @@ func main() {
 		mainlog.Fatal(errInit)
 	}
 	// initialize server
-	server, err := rest.InitServer(ctx, cfg, storageInit)
+	server, err := api_grpc.InitServer(ctx, cfg, storageInit)
 	if err != nil {
+		mainlog.Fatal(err)
+	}
+	// set a listener for GRPC server
+	listen, err := net.Listen("tcp", cfg.ServerAddress)
+	if err != nil {
+		mainlog.Fatal(err)
+	}
+	// create a new GRPC server
+	s := grpc.NewServer()
+	// register a service
+	pb.RegisterShortenerServer(s, server)
+	mainlog.Print("Server start attempted")
+	if err := s.Serve(listen); err != nil {
 		mainlog.Fatal(err)
 	}
 	// set a listener for os.Signal
@@ -91,27 +104,9 @@ func main() {
 	go func() {
 		<-done
 		mainlog.Print("Server shutdown attempted")
-		ctxTO, cancelTO := context.WithTimeout(ctx, 5*time.Second)
-		defer cancelTO()
-		if err := server.Shutdown(ctxTO); err != nil {
-			mainlog.Fatal("Server shutdown failed:", err)
-		}
+		s.GracefulStop()
 		cancel()
 	}()
-	// start up the server
-	mainlog.Print("Server start attempted")
-	if !cfg.EnableHTTPS {
-		mainlog.Print("Using HTTP")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			mainlog.Fatal(err)
-		}
-	} else {
-		mainlog.Print("Using HTTPS")
-		if err := server.ListenAndServeTLS("../../certs/localhost.crt", "../../certs/localhost.key"); err != nil && err != http.ErrServerClosed {
-			mainlog.Fatal(err)
-		}
-	}
-	// wait for goroutine in InitStorage to finish before exiting
 	wg.Wait()
 	mainlog.Print("Server shutdown succeeded")
 }

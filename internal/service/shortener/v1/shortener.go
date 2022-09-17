@@ -52,7 +52,7 @@ func InitShortener(s storage.URLStorage) (*Shortener, error) {
 }
 
 // GetStats retrieves total number of sURLs and clients from storage.
-func (short *Shortener) GetStats(ctx context.Context) (nURLs int, nUsers int, err error) {
+func (short *Shortener) GetStats(ctx context.Context) (nURLs int64, nUsers int64, err error) {
 	nURLs, nUsers, err = short.URLStorage.GetStats(ctx)
 	if err != nil {
 		return 0, 0, err

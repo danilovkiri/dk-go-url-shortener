@@ -61,9 +61,9 @@ func InitStorage(ctx context.Context, wg *sync.WaitGroup, cfg *config.Config) (*
 	return &st, nil
 }
 
-func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
+func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int64, err error) {
 	// create channels for listening to the go routine result
-	retrieveDone := make(chan []int, 1)
+	retrieveDone := make(chan []int64, 1)
 	go func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -73,7 +73,7 @@ func (s *Storage) GetStats(ctx context.Context) (nURLs, nUsers int, err error) {
 			uniqueUsers[URL.UserID] = true
 		}
 		countUsers := len(uniqueUsers)
-		retrieveDone <- []int{countURLs, countUsers}
+		retrieveDone <- []int64{int64(countURLs), int64(countUsers)}
 	}()
 
 	// wait for the first channel to retrieve a value

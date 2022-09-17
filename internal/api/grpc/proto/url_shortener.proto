@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package demo;
+
+option go_package = "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto/proto";
+
+message PingDBRequest {
+}
+
+message PingDBResponse {
+}
+
+message GetStatsRequest {
+}
+
+message GetStatsResponse {
+  int64 urls = 1;
+  int64 users = 2;
+}
+
+message GetURLRequest {
+  string short_url_id = 1;
+}
+
+message GetURLResponse {
+  string redirect_to = 1;
+}
+
+message GetURLsByUserIDRequest {
+}
+
+message ResponsePairURL {
+  string short_url = 1;
+  string full_url = 2;
+}
+
+message GetURLsByUserIDResponse {
+  repeated ResponsePairURL response_pairs_urls = 1;
+}
+
+message PostURLRequest {
+  string full_url = 1;
+}
+
+message PostURLResponse {
+  string short_url = 1;
+}
+
+message PostURLBatch {
+  string correlation_id = 1;
+  string url = 2;
+}
+
+message PostURLBatchRequest {
+  repeated PostURLBatch request_urls = 1;
+}
+
+message PostURLBatchResponse {
+  repeated PostURLBatch response_urls = 1;
+}
+
+message DeleteURLBatch {
+  repeated string urls = 1;
+}
+
+message DeleteURLBatchRequest {
+  DeleteURLBatch request_urls = 1;
+}
+
+message DeleteURLBatchResponse {
+}
+
+message GetUptimeRequest {
+}
+
+message GetUptimeResponse {
+  int64 uptime = 1;
+}
+
+service Shortener {
+  rpc PingDB(PingDBRequest) returns (PingDBResponse);
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+  rpc GetURL(GetURLRequest) returns (GetURLResponse);
+  rpc GetURLsByUserID(GetURLsByUserIDRequest) returns (GetURLsByUserIDResponse);
+  rpc PostURL(PostURLRequest) returns (PostURLResponse);
+  rpc PostURLBatch(PostURLBatchRequest) returns (PostURLBatchResponse);
+  rpc DeleteURLBatch(DeleteURLBatchRequest) returns (DeleteURLBatchResponse);
+  rpc GetUptime(GetUptimeRequest) returns (GetUptimeResponse);
+}

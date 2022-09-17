@@ -31,7 +31,7 @@ func uptime() interface{} {
 	return int64(time.Since(serverStart).Seconds())
 }
 
-// InitServer returns a http.Server object ready to be listening and serving .
+// InitServer returns a http.Server object ready to be listening and serving.
 func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStorage) (server *http.Server, err error) {
 	shortenerService, err := shortener.InitShortener(storage)
 	if err != nil {

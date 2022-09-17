@@ -29,11 +29,11 @@ func TestShortener_GetStats_Fail(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
-	s.EXPECT().GetStats(context.Background()).Return(0, 0, errors.New("generic error"))
+	s.EXPECT().GetStats(context.Background()).Return(int64(0), int64(0), errors.New("generic error"))
 	processor, _ := InitShortener(s)
 	URLs, users, err := processor.GetStats(context.Background())
-	assert.Equal(t, URLs, 0)
-	assert.Equal(t, users, 0)
+	assert.Equal(t, URLs, int64(0))
+	assert.Equal(t, users, int64(0))
 	assert.Equal(t, err, errors.New("generic error"))
 }
 
@@ -41,11 +41,11 @@ func TestShortener_GetStats(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockURLStorage(ctrl)
-	s.EXPECT().GetStats(context.Background()).Return(10, 12, nil)
+	s.EXPECT().GetStats(context.Background()).Return(int64(10), int64(12), nil)
 	processor, _ := InitShortener(s)
 	URLs, users, err := processor.GetStats(context.Background())
-	assert.Equal(t, URLs, 10)
-	assert.Equal(t, users, 12)
+	assert.Equal(t, URLs, int64(10))
+	assert.Equal(t, users, int64(12))
 	assert.Equal(t, err, nil)
 }
 

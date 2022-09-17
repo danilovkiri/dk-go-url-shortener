@@ -33,7 +33,7 @@ type (
 	// ResponseStats is used in HandleGetStats
 	// swagger:response responseStats
 	ResponseStats struct {
-		URLs  int `json:"urls"`
-		Users int `json:"users"`
+		URLs  int64 `json:"urls"`
+		Users int64 `json:"users"`
 	}
 )

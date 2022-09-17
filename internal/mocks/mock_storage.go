@@ -78,11 +78,11 @@ func (mr *MockURLStorageMockRecorder) Dump(arg0, arg1, arg2, arg3 interface{}) *
 }
 
 // GetStats mocks base method.
-func (m *MockURLStorage) GetStats(arg0 context.Context) (int, int, error) {
+func (m *MockURLStorage) GetStats(arg0 context.Context) (int64, int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStats", arg0)
-	ret0, _ := ret[0].(int)
-	ret1, _ := ret[1].(int)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(int64)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
