@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	api_grpc "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/handlers"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/interceptors"
 	pb "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/infile"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/inpsql"
@@ -81,7 +83,7 @@ func main() {
 		mainlog.Fatal(errInit)
 	}
 	// initialize server
-	server, err := api_grpc.InitServer(ctx, cfg, storageInit)
+	server, err := handlers.InitServer(ctx, cfg, storageInit)
 	if err != nil {
 		mainlog.Fatal(err)
 	}
@@ -90,14 +92,12 @@ func main() {
 	if err != nil {
 		mainlog.Fatal(err)
 	}
+	// initialize a secretary service
+	secretaryService := secretary.NewSecretaryService(cfg)
+	// initialize an interceptor service
+	interceptorService := interceptors.NewAuthHandler(secretaryService, cfg)
 	// create a new GRPC server
-	s := grpc.NewServer()
-	// register a service
-	pb.RegisterShortenerServer(s, server)
-	mainlog.Print("Server start attempted")
-	if err := s.Serve(listen); err != nil {
-		mainlog.Fatal(err)
-	}
+	s := grpc.NewServer(grpc.UnaryInterceptor(interceptorService.UnaryServerInterceptor()))
 	// set a listener for os.Signal
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -107,6 +107,12 @@ func main() {
 		s.GracefulStop()
 		cancel()
 	}()
+	// register a service
+	pb.RegisterShortenerServer(s, server)
+	mainlog.Print("Server start attempted")
+	if err := s.Serve(listen); err != nil {
+		mainlog.Fatal(err)
+	}
 	wg.Wait()
 	mainlog.Print("Server shutdown succeeded")
 }

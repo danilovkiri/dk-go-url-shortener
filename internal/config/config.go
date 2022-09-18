@@ -17,6 +17,7 @@ type Config struct {
 	DatabaseDSN     string `json:"database_dsn" env:"DATABASE_DSN"`
 	UserKey         string `env:"USER_KEY" env-default:"jds__63h3_7ds"`
 	TrustedSubnet   string `json:"trusted_subnet" env:"TRUSTED_SUBNET"`
+	AuthKey         string `env:"AUTH_KEY" env-default:"user"`
 }
 
 // NewDefaultConfiguration initializes a configuration struct.

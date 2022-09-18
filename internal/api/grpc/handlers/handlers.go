@@ -1,56 +1,78 @@
+// Package handlers provides GRPC methods.
 package handlers
 
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net/url"
-	"time"
-
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/interceptors"
 	pb "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
+	processor "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener/v1"
+	"github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1"
 	storageErrors "github.com/danilovkiri/dk_go_url_shortener/internal/storage/v1/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"log"
+	"net/url"
+	"time"
 )
 
-// GRPCHandler defines data structure handling and provides support for adding new implementations.
-type GRPCHandler struct {
-	processor    shortener.Processor
-	serverConfig *config.Config
+var (
+	serverStart = time.Now()
+)
+
+// uptime returns time in seconds since the server start-up.
+func uptime() int64 {
+	return int64(time.Since(serverStart).Seconds())
 }
 
-// InitGRPCHandler initializes a URLHandler object and sets its attributes.
-func InitGRPCHandler(processor shortener.Processor, serverConfig *config.Config) (*GRPCHandler, error) {
-	if processor == nil {
-		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
-	}
-	return &GRPCHandler{processor: processor, serverConfig: serverConfig}, nil
+// ShortenerServer defines server methods and attributes.
+type ShortenerServer struct {
+	pb.UnimplementedShortenerServer
+	processor processor.Processor
+	cfg       *config.Config
 }
 
-// HandlePingDB handles PSQL DB pinging to check connection status.
-func (h *GRPCHandler) HandlePingDB() (*pb.PingDBResponse, error) {
-	err := h.processor.PingDB()
+// InitServer returns a ShortenerServer object ready to be listening and serving.
+func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStorage) (server *ShortenerServer, err error) {
+	shortenerService, err := shortener.InitShortener(storage)
 	if err != nil {
+		return nil, err
+	}
+	return &ShortenerServer{processor: shortenerService, cfg: cfg}, nil
+}
+
+// GetUptime is a GRPC method for getting server uptime data.
+func (s *ShortenerServer) GetUptime(_ context.Context, _ *pb.GetUptimeRequest) (*pb.GetUptimeResponse, error) {
+	var response pb.GetUptimeResponse
+	response.Uptime = uptime()
+	return &response, nil
+}
+
+// PingDB is a GRPC method to check DB connection and establish it if closed.
+func (s *ShortenerServer) PingDB(_ context.Context, _ *pb.PingDBRequest) (*pb.PingDBResponse, error) {
+	err := s.processor.PingDB()
+	if err != nil {
+		log.Println("HandlePingDB:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	var response pb.PingDBResponse
 	return &response, nil
 }
 
-// HandleGetStats provides client with statistics on URLs and clients.
-func (h *GRPCHandler) HandleGetStats(ctx context.Context) (*pb.GetStatsResponse, error) {
+// GetStats is a GRPC method to retrieve storage usage stats.
+func (s *ShortenerServer) GetStats(ctx context.Context, _ *pb.GetStatsRequest) (*pb.GetStatsResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	nURLs, nUsers, err := h.processor.GetStats(ctx)
+	nURLs, nUsers, err := s.processor.GetStats(ctx)
 	if err != nil {
 		var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 		if errors.As(err, &contextTimeoutExceededError) {
+			log.Println("HandleGetStats:", err)
 			return nil, status.Error(codes.DeadlineExceeded, err.Error())
 		}
+		log.Println("HandleGetStats:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	response := pb.GetStatsResponse{
@@ -60,49 +82,54 @@ func (h *GRPCHandler) HandleGetStats(ctx context.Context) (*pb.GetStatsResponse,
 	return &response, nil
 }
 
-// HandleGetURL provides client with a redirect to the original URL accessed by shortened URL.
-func (h *GRPCHandler) HandleGetURL(ctx context.Context, request *pb.GetURLRequest) (*pb.GetURLResponse, error) {
+// GetURL is a GRPC method for getting original URL based on shortened URL ID.
+func (s *ShortenerServer) GetURL(ctx context.Context, request *pb.GetURLRequest) (*pb.GetURLResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	sURL := request.ShortUrlId
-	URL, err := h.processor.Decode(ctx, sURL)
+	URL, err := s.processor.Decode(ctx, sURL)
 	if err != nil {
 		var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 		var deletedError *storageErrors.DeletedError
 		if errors.As(err, &contextTimeoutExceededError) {
+			log.Println("HandleGetURL:", err)
 			return nil, status.Error(codes.DeadlineExceeded, err.Error())
 		} else if errors.As(err, &deletedError) {
+			log.Println("HandleGetURL:", err)
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
+		log.Println("HandleGetURL:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	log.Println("HandleGetURL: retrieved URL", URL)
 	response := pb.GetURLResponse{
 		RedirectTo: URL,
 	}
 	return &response, nil
 }
 
-// HandleGetURLsByUserID provides shortening service using modeldto.ResponseFullURL schema.
-func (h *GRPCHandler) HandleGetURLsByUserID(ctx context.Context) (*pb.GetURLsByUserIDResponse, error) {
+// GetURLsByUserID is a GRPC method for getting all user-specific pairs of full and shortened URLs.
+func (s *ShortenerServer) GetURLsByUserID(ctx context.Context, _ *pb.GetURLsByUserIDRequest) (*pb.GetURLsByUserIDResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	userID, err := getUserID(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	URLs, err := h.processor.DecodeByUserID(ctx, userID)
+	userID := s.getUserID(ctx)
+	URLs, err := s.processor.DecodeByUserID(ctx, userID)
 	if err != nil {
 		var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 		if errors.As(err, &contextTimeoutExceededError) {
+			log.Println("HandleGetURLsByUserID:", err)
 			return nil, status.Error(codes.DeadlineExceeded, err.Error())
 		}
+		log.Println("HandleGetURLsByUserID:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if len(URLs) == 0 {
+		log.Println("HandleGetURLsByUserID:", "No content available")
 		return nil, status.Error(codes.NotFound, `No content available`)
 	}
-	u, err := url.Parse(h.serverConfig.BaseURL)
+	u, err := url.Parse(s.cfg.BaseURL)
 	if err != nil {
+		log.Println("HandleGetURLsByUserID:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	response := pb.GetURLsByUserIDResponse{}
@@ -117,24 +144,23 @@ func (h *GRPCHandler) HandleGetURLsByUserID(ctx context.Context) (*pb.GetURLsByU
 	return &response, nil
 }
 
-// HandlePostURL stores the original URL with its shortened version.
-func (h *GRPCHandler) HandlePostURL(ctx context.Context, request *pb.PostURLRequest) (*pb.PostURLResponse, error) {
+// PostURL is a GRPC method to get a shortened URL for an original URL and store them in DB.
+func (s *ShortenerServer) PostURL(ctx context.Context, request *pb.PostURLRequest) (*pb.PostURLResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	URL := request.FullUrl
-	userID, err := getUserID(ctx)
+	userID := s.getUserID(ctx)
+	u, err := url.Parse(s.cfg.BaseURL)
 	if err != nil {
+		log.Println("HandlePostURL:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	u, err := url.Parse(h.serverConfig.BaseURL)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	sURL, err := h.processor.Encode(ctx, URL, userID)
+	sURL, err := s.processor.Encode(ctx, URL, userID)
 	if err != nil {
 		var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 		var alreadyExistsError *storageErrors.AlreadyExistsError
 		if errors.As(err, &contextTimeoutExceededError) {
+			log.Println("HandlePostURL:", err)
 			return nil, status.Error(codes.DeadlineExceeded, err.Error())
 		} else if errors.As(err, &alreadyExistsError) {
 			u.Path = alreadyExistsError.ValidSURL
@@ -143,8 +169,10 @@ func (h *GRPCHandler) HandlePostURL(ctx context.Context, request *pb.PostURLRequ
 			}
 			return &response, status.Error(codes.AlreadyExists, `Entry already exists and was returned in response body`)
 		}
+		log.Println("HandlePostURL:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	log.Println("HandlePostURL: stored", URL, "as", sURL)
 	u.Path = sURL
 	response := pb.PostURLResponse{
 		ShortUrl: u.String(),
@@ -152,25 +180,28 @@ func (h *GRPCHandler) HandlePostURL(ctx context.Context, request *pb.PostURLRequ
 	return &response, nil
 }
 
-// HandlePostURLBatch provides shortening service for batch processing using PostURLBatchRequest and PostURLBatchResponse schemas.
-func (h *GRPCHandler) HandlePostURLBatch(ctx context.Context, request *pb.PostURLBatchRequest) (*pb.PostURLBatchResponse, error) {
+// PostURLBatch is a GRPC method to get shortened URLs for a batch of original URLs and store them in DB.
+func (s *ShortenerServer) PostURLBatch(ctx context.Context, request *pb.PostURLBatchRequest) (*pb.PostURLBatchResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	userID, err := getUserID(ctx)
+	userID := s.getUserID(ctx)
+	u, err := url.Parse(s.cfg.BaseURL)
 	if err != nil {
+		log.Println("HandlePostURLBatch:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	u, err := url.Parse(h.serverConfig.BaseURL)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	if len(request.RequestUrls) == 0 {
+		log.Println("HandlePostURLBatch:", "empty request")
+		return nil, status.Error(codes.Internal, "Empty request")
 	}
 	response := pb.PostURLBatchResponse{}
 	for _, requestBatchURL := range request.RequestUrls {
-		sURL, err1 := h.processor.Encode(ctx, requestBatchURL.Url, userID)
+		sURL, err1 := s.processor.Encode(ctx, requestBatchURL.Url, userID)
 		if err1 != nil {
 			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
 			var alreadyExistsError *storageErrors.AlreadyExistsError
 			if errors.As(err1, &contextTimeoutExceededError) {
+				log.Println("HandlePostURLBatch:", err1)
 				return nil, status.Error(codes.DeadlineExceeded, err1.Error())
 			} else if errors.As(err1, &alreadyExistsError) {
 				sURL = alreadyExistsError.ValidSURL
@@ -182,8 +213,10 @@ func (h *GRPCHandler) HandlePostURLBatch(ctx context.Context, request *pb.PostUR
 				response.ResponseUrls = append(response.ResponseUrls, &responseBatchURL)
 				continue
 			}
+			log.Println("HandlePostURLBatch:", err1)
 			return nil, status.Error(codes.Internal, err1.Error())
 		}
+		log.Println("HandlePostURLBatch: stored", requestBatchURL.Url, "as", sURL)
 		u.Path = sURL
 		responseBatchURL := pb.PostURLBatch{
 			CorrelationId: requestBatchURL.CorrelationId,
@@ -194,31 +227,23 @@ func (h *GRPCHandler) HandlePostURLBatch(ctx context.Context, request *pb.PostUR
 	return &response, nil
 }
 
-// HandleDeleteURLBatch sets a tag for deletion for a batch of URL entries in DB.
-func (h *GRPCHandler) HandleDeleteURLBatch(ctx context.Context, request *pb.DeleteURLBatchRequest) (*pb.DeleteURLBatchResponse, error) {
+// DeleteURLBatch is a GRPC method for deleting DB entries based on a batch of shortened URL IDs.
+func (s *ShortenerServer) DeleteURLBatch(ctx context.Context, request *pb.DeleteURLBatchRequest) (*pb.DeleteURLBatchResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	userID, err := getUserID(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	userID := s.getUserID(ctx)
 	deleteURLs := make([]string, 0)
 	deleteURLs = append(deleteURLs, request.RequestUrls.Urls...)
-	h.processor.Delete(ctx, deleteURLs, userID)
+	log.Println("DELETE request detected for", deleteURLs)
+	s.processor.Delete(ctx, deleteURLs, userID)
 	var response pb.DeleteURLBatchResponse
 	return &response, nil
 }
 
 // getUserID retrieves user identifier as a value of GRPC metadata.
-func getUserID(ctx context.Context) (string, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", errors.New("GRPC metadata was not found")
-	}
-	values := md.Get(interceptors.UserAuthKey)
-	if len(values) <= 0 {
-		return "", errors.New("empty array of values was found for user key")
-	}
+func (s *ShortenerServer) getUserID(ctx context.Context) string {
+	md, _ := metadata.FromIncomingContext(ctx)
+	values := md.Get(s.cfg.AuthKey)
 	userID := values[0]
-	return userID, nil
+	return userID
 }

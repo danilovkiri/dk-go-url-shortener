@@ -20,6 +20,7 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	_ = os.Setenv("ENABLE_HTTPS", "false")
 	_ = os.Setenv("TRUSTED_SUBNET", "some_subnet")
+	_ = os.Setenv("AUTH_KEY", "user")
 	cfg := NewDefaultConfiguration()
 	var a = ""
 	var b = ""
@@ -40,6 +41,7 @@ func TestNewDefaultConfiguration(t *testing.T) {
 		DatabaseDSN:     "some_dsn",
 		UserKey:         "some_user_key",
 		TrustedSubnet:   "some_subnet",
+		AuthKey:         "user",
 	}
 	assert.Equal(t, &expCfg, cfg)
 }
@@ -61,6 +63,7 @@ func TestConfig_ParseFlags(t *testing.T) {
 		DatabaseDSN:     "postgres://username:password@localhost:5432/database_name",
 		UserKey:         "some_user_key",
 		TrustedSubnet:   "192.168.1.0/24",
+		AuthKey:         "user",
 	}
 	assert.Equal(t, &expCfg, cfg)
 }

@@ -21,7 +21,6 @@ type TrustedNetHandler struct {
 // NewTrustedNetHandler initializes a new trusted network handler.
 func NewTrustedNetHandler(cfg *config.Config) *TrustedNetHandler {
 	ip, ipnet, err := net.ParseCIDR(cfg.TrustedSubnet)
-	log.Print(err)
 	var parseError *net.ParseError
 	if errors.As(err, &parseError) {
 		log.Println("Trusted network was not initialized:", err)
