@@ -1,17 +1,10 @@
 syntax = "proto3";
 
-package demo;
+package proto;
 
-option go_package = "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto/proto";
+import "google/protobuf/empty.proto";
 
-message PingDBRequest {
-}
-
-message PingDBResponse {
-}
-
-message GetStatsRequest {
-}
+option go_package = "grpc/proto";
 
 message GetStatsResponse {
   int64 urls = 1;
@@ -24,9 +17,6 @@ message GetURLRequest {
 
 message GetURLResponse {
   string redirect_to = 1;
-}
-
-message GetURLsByUserIDRequest {
 }
 
 message ResponsePairURL {
@@ -67,23 +57,17 @@ message DeleteURLBatchRequest {
   DeleteURLBatch request_urls = 1;
 }
 
-message DeleteURLBatchResponse {
-}
-
-message GetUptimeRequest {
-}
-
 message GetUptimeResponse {
   int64 uptime = 1;
 }
 
 service Shortener {
-  rpc PingDB(PingDBRequest) returns (PingDBResponse);
-  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+  rpc PingDB(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc GetStats(google.protobuf.Empty) returns (GetStatsResponse);
   rpc GetURL(GetURLRequest) returns (GetURLResponse);
-  rpc GetURLsByUserID(GetURLsByUserIDRequest) returns (GetURLsByUserIDResponse);
+  rpc GetURLsByUserID(google.protobuf.Empty) returns (GetURLsByUserIDResponse);
   rpc PostURL(PostURLRequest) returns (PostURLResponse);
   rpc PostURLBatch(PostURLBatchRequest) returns (PostURLBatchResponse);
-  rpc DeleteURLBatch(DeleteURLBatchRequest) returns (DeleteURLBatchResponse);
-  rpc GetUptime(GetUptimeRequest) returns (GetUptimeResponse);
+  rpc DeleteURLBatch(DeleteURLBatchRequest) returns (google.protobuf.Empty);
+  rpc GetUptime(google.protobuf.Empty) returns (GetUptimeResponse);
 }

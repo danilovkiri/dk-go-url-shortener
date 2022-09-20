@@ -13,6 +13,7 @@ type Config struct {
 	ServerAddress   string `json:"server_address" env:"SERVER_ADDRESS"`
 	BaseURL         string `json:"base_url" env:"BASE_URL"`
 	EnableHTTPS     bool   `json:"enable_https" env:"ENABLE_HTTPS"`
+	UseGRPC         bool   `json:"use_grpc" env:"USE_GRPC"`
 	FileStoragePath string `json:"file_storage_path" env:"FILE_STORAGE_PATH"`
 	DatabaseDSN     string `json:"database_dsn" env:"DATABASE_DSN"`
 	UserKey         string `env:"USER_KEY" env-default:"jds__63h3_7ds"`
@@ -37,7 +38,7 @@ func isFlagPassed(name string) bool {
 	return found
 }
 
-func (cfg *Config) assignValues(a, b, f, d, c, t *string, s *bool) error {
+func (cfg *Config) assignValues(a, b, f, d, c, t *string, s, g *bool) error {
 	// priority: flag -> env -> json config -> default flag
 	var err error
 	if *c != "" {
@@ -67,6 +68,9 @@ func (cfg *Config) assignValues(a, b, f, d, c, t *string, s *bool) error {
 	if isFlagPassed("s") || !cfg.EnableHTTPS {
 		cfg.EnableHTTPS = *s
 	}
+	if isFlagPassed("g") || !cfg.UseGRPC {
+		cfg.UseGRPC = *g
+	}
 	return nil
 }
 
@@ -80,7 +84,8 @@ func (cfg *Config) Parse() error {
 	f := flag.String("f", "url_storage.json", "File storage path")
 	s := flag.Bool("s", false, "Use HTTPS connection")
 	t := flag.String("t", "", "Trusted subnet")
+	g := flag.Bool("g", false, "Use GRPC protocol")
 	flag.Parse()
-	err := cfg.assignValues(a, b, f, d, c, t, s)
+	err := cfg.assignValues(a, b, f, d, c, t, s, g)
 	return err
 }

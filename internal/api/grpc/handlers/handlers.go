@@ -4,6 +4,10 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log"
+	"net/url"
+	"time"
+
 	pb "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	processor "github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
@@ -13,9 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"log"
-	"net/url"
-	"time"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 var (
@@ -44,25 +46,25 @@ func InitServer(ctx context.Context, cfg *config.Config, storage storage.URLStor
 }
 
 // GetUptime is a GRPC method for getting server uptime data.
-func (s *ShortenerServer) GetUptime(_ context.Context, _ *pb.GetUptimeRequest) (*pb.GetUptimeResponse, error) {
+func (s *ShortenerServer) GetUptime(_ context.Context, _ *emptypb.Empty) (*pb.GetUptimeResponse, error) {
 	var response pb.GetUptimeResponse
 	response.Uptime = uptime()
 	return &response, nil
 }
 
 // PingDB is a GRPC method to check DB connection and establish it if closed.
-func (s *ShortenerServer) PingDB(_ context.Context, _ *pb.PingDBRequest) (*pb.PingDBResponse, error) {
+func (s *ShortenerServer) PingDB(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
 	err := s.processor.PingDB()
 	if err != nil {
 		log.Println("HandlePingDB:", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	var response pb.PingDBResponse
+	var response emptypb.Empty
 	return &response, nil
 }
 
 // GetStats is a GRPC method to retrieve storage usage stats.
-func (s *ShortenerServer) GetStats(ctx context.Context, _ *pb.GetStatsRequest) (*pb.GetStatsResponse, error) {
+func (s *ShortenerServer) GetStats(ctx context.Context, _ *emptypb.Empty) (*pb.GetStatsResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	nURLs, nUsers, err := s.processor.GetStats(ctx)
@@ -109,7 +111,7 @@ func (s *ShortenerServer) GetURL(ctx context.Context, request *pb.GetURLRequest)
 }
 
 // GetURLsByUserID is a GRPC method for getting all user-specific pairs of full and shortened URLs.
-func (s *ShortenerServer) GetURLsByUserID(ctx context.Context, _ *pb.GetURLsByUserIDRequest) (*pb.GetURLsByUserIDResponse, error) {
+func (s *ShortenerServer) GetURLsByUserID(ctx context.Context, _ *emptypb.Empty) (*pb.GetURLsByUserIDResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	userID := s.getUserID(ctx)
@@ -228,7 +230,7 @@ func (s *ShortenerServer) PostURLBatch(ctx context.Context, request *pb.PostURLB
 }
 
 // DeleteURLBatch is a GRPC method for deleting DB entries based on a batch of shortened URL IDs.
-func (s *ShortenerServer) DeleteURLBatch(ctx context.Context, request *pb.DeleteURLBatchRequest) (*pb.DeleteURLBatchResponse, error) {
+func (s *ShortenerServer) DeleteURLBatch(ctx context.Context, request *pb.DeleteURLBatchRequest) (*emptypb.Empty, error) {
 	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 	userID := s.getUserID(ctx)
@@ -236,7 +238,7 @@ func (s *ShortenerServer) DeleteURLBatch(ctx context.Context, request *pb.Delete
 	deleteURLs = append(deleteURLs, request.RequestUrls.Urls...)
 	log.Println("DELETE request detected for", deleteURLs)
 	s.processor.Delete(ctx, deleteURLs, userID)
-	var response pb.DeleteURLBatchResponse
+	var response emptypb.Empty
 	return &response, nil
 }
 

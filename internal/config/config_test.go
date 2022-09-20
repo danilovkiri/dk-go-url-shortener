@@ -29,7 +29,8 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	var c = ""
 	var tt = ""
 	var s = false
-	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s)
+	var g = false
+	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s, &g)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,6 +38,7 @@ func TestNewDefaultConfiguration(t *testing.T) {
 		ServerAddress:   "some_server_address",
 		BaseURL:         "some_base_url",
 		EnableHTTPS:     false,
+		UseGRPC:         false,
 		FileStoragePath: "some_file",
 		DatabaseDSN:     "some_dsn",
 		UserKey:         "some_user_key",
@@ -59,6 +61,7 @@ func TestConfig_ParseFlags(t *testing.T) {
 		ServerAddress:   ":8080",
 		BaseURL:         "json_base_url",
 		EnableHTTPS:     true,
+		UseGRPC:         false,
 		FileStoragePath: "url_storage.json",
 		DatabaseDSN:     "postgres://username:password@localhost:5432/database_name",
 		UserKey:         "some_user_key",
@@ -78,7 +81,8 @@ func TestConfig_parseAppConfigPathError(t *testing.T) {
 	var c = "nonexistent_file.json"
 	var tt = ""
 	var s = false
-	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s)
+	var g = false
+	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s, &g)
 	var error *fs.PathError
 	assert.ErrorAs(t, err, &error)
 }
@@ -101,10 +105,11 @@ func BenchmarkNewDefaultConfiguration(b *testing.B) {
 	var c = ""
 	var tt = ""
 	var s = false
+	var g = false
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cfg := NewDefaultConfiguration()
-		err := cfg.assignValues(&a, &bb, &f, &d, &c, &tt, &s)
+		err := cfg.assignValues(&a, &bb, &f, &d, &c, &tt, &s, &g)
 		if err != nil {
 			log.Fatal(err)
 		}

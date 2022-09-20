@@ -2,6 +2,11 @@ package handlers
 
 import (
 	"context"
+	"log"
+	"net"
+	"sync"
+	"testing"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/interceptors"
 	pb "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
@@ -17,10 +22,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"log"
-	"net"
-	"sync"
-	"testing"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type HandlersTestSuite struct {
@@ -82,12 +84,14 @@ func (suite *HandlersTestSuite) TestPingDB() {
 	// perform each test
 	for i := 0; i < 1; i++ {
 		suite.T().Run("ping", func(t *testing.T) {
-			resp, err1 := c.PingDB(ctx, &pb.PingDBRequest{})
+			var request emptypb.Empty
+			resp, err1 := c.PingDB(ctx, &request)
 			if err1 != nil {
 				t.Fatalf("Could not perform request: %s", err1)
 			}
 			assert.Equal(t, nil, err1)
-			assert.IsType(t, &pb.PingDBResponse{}, resp)
+			var response *emptypb.Empty
+			assert.IsType(t, response, resp)
 		})
 	}
 	suite.s.GracefulStop()
@@ -110,7 +114,8 @@ func (suite *HandlersTestSuite) TestGetUptime() {
 	// perform each test
 	for i := 0; i < 10; i++ {
 		suite.T().Run("uptime", func(t *testing.T) {
-			resp, err1 := c.GetUptime(ctx, &pb.GetUptimeRequest{})
+			var request emptypb.Empty
+			resp, err1 := c.GetUptime(ctx, &request)
 			if err1 != nil {
 				t.Fatalf("Could not perform request: %s", err1)
 			}
@@ -138,7 +143,8 @@ func (suite *HandlersTestSuite) TestGetStats() {
 	// perform each test
 	for i := 0; i < 10; i++ {
 		suite.T().Run("stats", func(t *testing.T) {
-			resp, err1 := c.GetStats(ctx, &pb.GetStatsRequest{})
+			var request emptypb.Empty
+			resp, err1 := c.GetStats(ctx, &request)
 			if err1 != nil {
 				t.Fatalf("Could not perform request: %s", err1)
 			}
@@ -381,7 +387,8 @@ func (suite *HandlersTestSuite) TestGetURLsByUserID() {
 		suite.T().Run("post", func(t *testing.T) {
 			md := metadata.New(map[string]string{"user": tt.token})
 			ctx := metadata.NewOutgoingContext(context.Background(), md)
-			resp, err1 := c.GetURLsByUserID(ctx, &pb.GetURLsByUserIDRequest{})
+			var request emptypb.Empty
+			resp, err1 := c.GetURLsByUserID(ctx, &request)
 			e, _ := status.FromError(err1)
 			assert.Equal(t, tt.want.code, e.Code())
 			assert.IsType(t, &pb.GetURLsByUserIDResponse{}, resp)
@@ -428,7 +435,8 @@ func (suite *HandlersTestSuite) TestDeleteURLBatch() {
 			resp, err1 := c.DeleteURLBatch(ctx, &pb.DeleteURLBatchRequest{RequestUrls: tt.batch})
 			e, _ := status.FromError(err1)
 			assert.Equal(t, tt.want.code, e.Code())
-			assert.IsType(t, &pb.DeleteURLBatchResponse{}, resp)
+			var response *emptypb.Empty
+			assert.IsType(t, response, resp)
 		})
 	}
 	suite.s.GracefulStop()

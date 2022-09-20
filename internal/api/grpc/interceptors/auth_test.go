@@ -2,6 +2,9 @@ package interceptors
 
 import (
 	"context"
+	"net"
+	"testing"
+
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/handlers"
 	pb "github.com/danilovkiri/dk_go_url_shortener/internal/api/grpc/proto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
@@ -14,8 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"net"
-	"testing"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestAuthHandler_AuthFunc_NoMD(t *testing.T) {
@@ -109,7 +111,8 @@ func TestAuthHandler_UnaryServerInterceptor_NoMD(t *testing.T) {
 	ctx := context.Background()
 	var header, trailer metadata.MD
 	c := pb.NewShortenerClient(conn)
-	resp, err := c.PingDB(ctx, &pb.PingDBRequest{}, grpc.Header(&header), grpc.Trailer(&trailer))
+	var request emptypb.Empty
+	resp, err := c.PingDB(ctx, &request, grpc.Header(&header), grpc.Trailer(&trailer))
 	assert.Equal(t, []string{"application/grpc"}, header.Get("content-type"))
 	assert.NotEmpty(t, header.Get("user"))
 	s.GracefulStop()
@@ -152,7 +155,8 @@ func TestAuthHandler_UnaryServerInterceptor_CorrectMD(t *testing.T) {
 	md := metadata.New(map[string]string{"user": token})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	c := pb.NewShortenerClient(conn)
-	resp, err := c.PingDB(ctx, &pb.PingDBRequest{})
+	var request emptypb.Empty
+	resp, err := c.PingDB(ctx, &request)
 	s.GracefulStop()
 	assert.Equal(t, nil, err)
 	assert.NotEmpty(t, resp)
@@ -192,7 +196,8 @@ func TestAuthHandler_UnaryServerInterceptor_IncorrectMD(t *testing.T) {
 	md := metadata.New(map[string]string{"user": token})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	c := pb.NewShortenerClient(conn)
-	_, err = c.PingDB(ctx, &pb.PingDBRequest{})
+	var request emptypb.Empty
+	_, err = c.PingDB(ctx, &request)
 	s.GracefulStop()
 	if e, ok := status.FromError(err); ok {
 		assert.Equal(t, codes.PermissionDenied, e.Code())
