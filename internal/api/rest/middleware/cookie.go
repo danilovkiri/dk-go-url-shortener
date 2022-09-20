@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
-	serviceErrors "github.com/danilovkiri/dk_go_url_shortener/internal/service/errors"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/secretary"
 	"github.com/google/uuid"
 )
@@ -17,14 +16,8 @@ type CookieHandler struct {
 	cfg *config.Config
 }
 
-// UserCookieKey sets a cookie key to be used in user identification.
-const UserCookieKey = "user"
-
 // NewCookieHandler initializes a new cookie handler.
 func NewCookieHandler(sec secretary.Secretary, cfg *config.Config) (*CookieHandler, error) {
-	if sec == nil {
-		return nil, &serviceErrors.ServiceFoundNilStorage{Msg: "nil secretary was passed to service initializer"}
-	}
 	return &CookieHandler{
 		sec: sec,
 		cfg: cfg,
@@ -34,12 +27,12 @@ func NewCookieHandler(sec secretary.Secretary, cfg *config.Config) (*CookieHandl
 // CookieHandle provides cookie handling functionality.
 func (c *CookieHandler) CookieHandle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie(UserCookieKey)
+		cookie, err := r.Cookie(c.cfg.AuthKey)
 		if errors.Is(err, http.ErrNoCookie) {
 			userID := uuid.New().String()
 			token := c.sec.Encode(userID)
 			newCookie := &http.Cookie{
-				Name:  UserCookieKey,
+				Name:  c.cfg.AuthKey,
 				Value: token,
 				Path:  "/",
 			}

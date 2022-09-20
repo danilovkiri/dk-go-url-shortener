@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package proto;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "grpc/proto";
+
+message GetStatsResponse {
+  int64 urls = 1;
+  int64 users = 2;
+}
+
+message GetURLRequest {
+  string short_url_id = 1;
+}
+
+message GetURLResponse {
+  string redirect_to = 1;
+}
+
+message ResponsePairURL {
+  string short_url = 1;
+  string full_url = 2;
+}
+
+message GetURLsByUserIDResponse {
+  repeated ResponsePairURL response_pairs_urls = 1;
+}
+
+message PostURLRequest {
+  string full_url = 1;
+}
+
+message PostURLResponse {
+  string short_url = 1;
+}
+
+message PostURLBatch {
+  string correlation_id = 1;
+  string url = 2;
+}
+
+message PostURLBatchRequest {
+  repeated PostURLBatch request_urls = 1;
+}
+
+message PostURLBatchResponse {
+  repeated PostURLBatch response_urls = 1;
+}
+
+message DeleteURLBatch {
+  repeated string urls = 1;
+}
+
+message DeleteURLBatchRequest {
+  DeleteURLBatch request_urls = 1;
+}
+
+message GetUptimeResponse {
+  int64 uptime = 1;
+}
+
+service Shortener {
+  rpc PingDB(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc GetStats(google.protobuf.Empty) returns (GetStatsResponse);
+  rpc GetURL(GetURLRequest) returns (GetURLResponse);
+  rpc GetURLsByUserID(google.protobuf.Empty) returns (GetURLsByUserIDResponse);
+  rpc PostURL(PostURLRequest) returns (PostURLResponse);
+  rpc PostURLBatch(PostURLBatchRequest) returns (PostURLBatchResponse);
+  rpc DeleteURLBatch(DeleteURLBatchRequest) returns (google.protobuf.Empty);
+  rpc GetUptime(google.protobuf.Empty) returns (GetUptimeResponse);
+}

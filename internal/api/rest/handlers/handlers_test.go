@@ -67,6 +67,7 @@ func (suite *HandlersTestSuite) SetupTest() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// parsing flags causes flag redefined errors
 	//cfg.ParseFlags()
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
@@ -83,6 +84,55 @@ func (suite *HandlersTestSuite) SetupTest() {
 
 func TestHandlersTestSuite(t *testing.T) {
 	suite.Run(t, new(HandlersTestSuite))
+}
+
+func (suite *HandlersTestSuite) TestHandleGetStats() {
+	userID := suite.secretaryService.Encode(uuid.New().String())
+	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.yandex.ru", userID)
+	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.yandex.com", userID)
+	_, _ = suite.shortenerService.Encode(suite.ctx, "https://www.yandex.kz", userID)
+	suite.router.Get("/api/internal/stats", suite.urlHandler.HandleGetStats())
+
+	// set tests' parameters
+	type want struct {
+		code  int
+		value modeldto.ResponseStats
+	}
+	tests := []struct {
+		name string
+		want want
+	}{
+		{
+			name: "Sample query",
+			want: want{
+				code: 200,
+				value: modeldto.ResponseStats{
+					URLs:  3,
+					Users: 1,
+				},
+			},
+		},
+	}
+
+	// perform each test
+	for _, tt := range tests {
+		suite.T().Run(tt.name, func(t *testing.T) {
+			client := resty.New()
+
+			res, err := client.R().Get(suite.ts.URL + "/api/internal/stats")
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+			assert.Equal(t, tt.want.code, res.StatusCode())
+			rb := res.Body()
+			var expectedResponse modeldto.ResponseStats
+			_ = json.Unmarshal(rb, &expectedResponse)
+			assert.Equal(t, tt.want.value, expectedResponse)
+		})
+	}
+	defer suite.ts.Close()
+	suite.cancel()
+	suite.wg.Wait()
 }
 
 func (suite *HandlersTestSuite) TestHandleGetURL() {
@@ -693,6 +743,7 @@ func ExampleInitURLHandler() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -721,6 +772,7 @@ func ExampleURLHandler_HandleGetURL() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -769,6 +821,7 @@ func ExampleURLHandler_HandlePostURL() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -815,6 +868,7 @@ func ExampleURLHandler_JSONHandlePostURL() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -865,6 +919,7 @@ func ExampleURLHandler_JSONHandlePostURLBatch() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -922,6 +977,7 @@ func ExampleURLHandler_HandleDeleteURLBatch() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -970,6 +1026,7 @@ func ExampleURLHandler_HandleGetURLsByUserID() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}
@@ -1022,6 +1079,7 @@ func ExampleURLHandler_HandlePingDB() {
 	cfg.ServerAddress = ":8080"
 	cfg.BaseURL = "http://localhost:8080"
 	cfg.FileStoragePath = "url_storage.json"
+	cfg.AuthKey = "user"
 	// Add context and wait group for storage operation control
 	ctx, cancel := context.WithCancel(context.Background())
 	wg := &sync.WaitGroup{}

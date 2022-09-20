@@ -10,7 +10,7 @@ import (
 
 // URLSetter defines a set of methods for types implementing URLSetter.
 type URLSetter interface {
-	Dump(ctx context.Context, URL string, sURL string, userID string) error
+	Dump(ctx context.Context, URL, sURL string, userID string) error
 }
 
 // URLBatchDeleter defines a set of methods for types implementing URLBatchDeleter.
@@ -39,6 +39,11 @@ type Closer interface {
 	CloseDB() error
 }
 
+// Maintainer defines a set of methods for types implementing Maintainer.
+type Maintainer interface {
+	GetStats(ctx context.Context) (nURLs, nUsers int64, err error)
+}
+
 // URLStorage defines a set of embedded interfaces for types implementing URLStorage.
 type URLStorage interface {
 	URLSetter
@@ -47,4 +52,5 @@ type URLStorage interface {
 	URLGetterByUserID
 	Pinger
 	Closer
+	Maintainer
 }

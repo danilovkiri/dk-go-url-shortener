@@ -16,18 +16,13 @@ import (
 
 // Tests
 
-func TestNewCookieHandler_Fail(t *testing.T) {
-	cfg := config.NewDefaultConfiguration()
-	_, err := NewCookieHandler(nil, cfg)
-	assert.Equal(t, "nil secretary was passed to service initializer", err.Error())
-}
-
 func TestCookieHandleAbsentCookie(t *testing.T) {
 	router := chi.NewRouter()
 	ts := httptest.NewServer(router)
 	defer ts.Close()
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -44,7 +39,7 @@ func TestCookieHandleAbsentCookie(t *testing.T) {
 		Path:  "/",
 	}
 	responseCookie := &http.Cookie{
-		Name:  UserCookieKey,
+		Name:  cfg.AuthKey,
 		Value: "some-expected-token",
 		Raw:   "user=some-expected-token; Path=/",
 		Path:  "/",
@@ -66,6 +61,7 @@ func TestCookieHandleGoodCookie(t *testing.T) {
 	defer ts.Close()
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -76,7 +72,7 @@ func TestCookieHandleGoodCookie(t *testing.T) {
 		w.Write([]byte("authorized"))
 	})
 	requestCookie := &http.Cookie{
-		Name:  UserCookieKey,
+		Name:  cfg.AuthKey,
 		Value: "some-expected-token",
 		Raw:   "user=some-expected-token; Path=/",
 		Path:  "/",
@@ -97,6 +93,7 @@ func TestCookieHandleBadCookie(t *testing.T) {
 	defer ts.Close()
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -107,7 +104,7 @@ func TestCookieHandleBadCookie(t *testing.T) {
 		w.Write([]byte("authorized"))
 	})
 	requestCookie := &http.Cookie{
-		Name:  UserCookieKey,
+		Name:  cfg.AuthKey,
 		Value: "some-erroneous-token",
 		Raw:   "user=some-erroneous-token; Path=/",
 		Path:  "/",
@@ -127,6 +124,7 @@ func TestCookieHandleBadCookie(t *testing.T) {
 func BenchmarkNewCookieHandler(b *testing.B) {
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -142,6 +140,7 @@ func BenchmarkHandleAbsentCookie(b *testing.B) {
 	defer ts.Close()
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -167,6 +166,7 @@ func BenchmarkHandleGoodCookie(b *testing.B) {
 	defer ts.Close()
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -177,7 +177,7 @@ func BenchmarkHandleGoodCookie(b *testing.B) {
 		w.Write([]byte("authorized"))
 	})
 	requestCookie := &http.Cookie{
-		Name:  UserCookieKey,
+		Name:  cfg.AuthKey,
 		Value: "some-expected-token",
 		Raw:   "user=some-expected-token; Path=/",
 		Path:  "/",
@@ -197,6 +197,7 @@ func BenchmarkHandleBadCookie(b *testing.B) {
 	defer ts.Close()
 	cfg := config.NewDefaultConfiguration()
 	cfg.UserKey = "jds__63h3_7ds"
+	cfg.AuthKey = "user"
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
 	s := mocks.NewMockSecretary(ctrl)
@@ -207,7 +208,7 @@ func BenchmarkHandleBadCookie(b *testing.B) {
 		w.Write([]byte("authorized"))
 	})
 	requestCookie := &http.Cookie{
-		Name:  UserCookieKey,
+		Name:  cfg.AuthKey,
 		Value: "some-erroneous-token",
 		Raw:   "user=some-erroneous-token; Path=/",
 		Path:  "/",

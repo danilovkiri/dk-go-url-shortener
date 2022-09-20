@@ -19,14 +19,18 @@ func TestNewDefaultConfiguration(t *testing.T) {
 	_ = os.Setenv("BASE_URL", "some_base_url")
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	_ = os.Setenv("ENABLE_HTTPS", "false")
+	_ = os.Setenv("TRUSTED_SUBNET", "some_subnet")
+	_ = os.Setenv("AUTH_KEY", "user")
 	cfg := NewDefaultConfiguration()
 	var a = ""
 	var b = ""
 	var f = ""
 	var d = ""
 	var c = ""
+	var tt = ""
 	var s = false
-	err := cfg.assignValues(&a, &b, &f, &d, &c, &s)
+	var g = false
+	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s, &g)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,9 +38,12 @@ func TestNewDefaultConfiguration(t *testing.T) {
 		ServerAddress:   "some_server_address",
 		BaseURL:         "some_base_url",
 		EnableHTTPS:     false,
+		UseGRPC:         false,
 		FileStoragePath: "some_file",
 		DatabaseDSN:     "some_dsn",
 		UserKey:         "some_user_key",
+		TrustedSubnet:   "some_subnet",
+		AuthKey:         "user",
 	}
 	assert.Equal(t, &expCfg, cfg)
 }
@@ -54,9 +61,12 @@ func TestConfig_ParseFlags(t *testing.T) {
 		ServerAddress:   ":8080",
 		BaseURL:         "json_base_url",
 		EnableHTTPS:     true,
+		UseGRPC:         false,
 		FileStoragePath: "url_storage.json",
 		DatabaseDSN:     "postgres://username:password@localhost:5432/database_name",
 		UserKey:         "some_user_key",
+		TrustedSubnet:   "192.168.1.0/24",
+		AuthKey:         "user",
 	}
 	assert.Equal(t, &expCfg, cfg)
 }
@@ -69,8 +79,10 @@ func TestConfig_parseAppConfigPathError(t *testing.T) {
 	var f = ""
 	var d = ""
 	var c = "nonexistent_file.json"
+	var tt = ""
 	var s = false
-	err := cfg.assignValues(&a, &b, &f, &d, &c, &s)
+	var g = false
+	err := cfg.assignValues(&a, &b, &f, &d, &c, &tt, &s, &g)
 	var error *fs.PathError
 	assert.ErrorAs(t, err, &error)
 }
@@ -85,16 +97,19 @@ func BenchmarkNewDefaultConfiguration(b *testing.B) {
 	_ = os.Setenv("BASE_URL", "some_base_url")
 	_ = os.Setenv("USER_KEY", "some_user_key")
 	_ = os.Setenv("ENABLE_HTTPS", "false")
+	_ = os.Setenv("TRUSTED_SUBNET", "some_subnet")
 	var a = ""
 	var bb = ""
 	var f = ""
 	var d = ""
 	var c = ""
+	var tt = ""
 	var s = false
+	var g = false
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cfg := NewDefaultConfiguration()
-		err := cfg.assignValues(&a, &bb, &f, &d, &c, &s)
+		err := cfg.assignValues(&a, &bb, &f, &d, &c, &tt, &s, &g)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -29,4 +29,11 @@ type (
 		CorrelationID string `json:"correlation_id"`
 		SURL          string `json:"short_url"`
 	}
+
+	// ResponseStats is used in HandleGetStats
+	// swagger:response responseStats
+	ResponseStats struct {
+		URLs  int64 `json:"urls"`
+		Users int64 `json:"users"`
+	}
 )

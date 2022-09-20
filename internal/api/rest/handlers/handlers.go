@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/middleware"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/api/rest/modeldto"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/config"
 	"github.com/danilovkiri/dk_go_url_shortener/internal/service/shortener"
@@ -35,16 +34,54 @@ var (
 
 // URLHandler defines data structure handling and provides support for adding new implementations.
 type URLHandler struct {
-	processor    shortener.Processor
-	serverConfig *config.Config
+	processor shortener.Processor
+	cfg       *config.Config
 }
 
 // InitURLHandler initializes a URLHandler object and sets its attributes.
-func InitURLHandler(processor shortener.Processor, serverConfig *config.Config) (*URLHandler, error) {
+func InitURLHandler(processor shortener.Processor, cfg *config.Config) (*URLHandler, error) {
 	if processor == nil {
 		return nil, fmt.Errorf("nil Shortener Service was passed to service URL Handler initializer")
 	}
-	return &URLHandler{processor: processor, serverConfig: serverConfig}, nil
+	return &URLHandler{processor: processor, cfg: cfg}, nil
+}
+
+// HandleGetStats provides client with statistics on URLs and clients.
+func (h *URLHandler) HandleGetStats() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
+		defer cancel()
+		nURLs, nUsers, err := h.processor.GetStats(ctx)
+		if err != nil {
+			var contextTimeoutExceededError *storageErrors.ContextTimeoutExceededError
+			if errors.As(err, &contextTimeoutExceededError) {
+				log.Println("HandleGetStats:", err)
+				http.Error(w, err.Error(), http.StatusGatewayTimeout)
+				return
+			}
+			log.Println("HandleGetStats:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		responseStats := modeldto.ResponseStats{
+			URLs:  nURLs,
+			Users: nUsers,
+		}
+		resBody, err := json.Marshal(responseStats)
+		if err != nil {
+			log.Println("HandleGetStats:", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// set and send response body
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err = w.Write(resBody)
+		if err != nil {
+			log.Println("HandleGetStats:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
 }
 
 // HandleGetURL provides client with a redirect to the original URL accessed by shortened URL.
@@ -91,7 +128,7 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 		defer cancel()
 		var responseURLs []modeldto.ResponseFullURL
 		// retrieve user identifier
-		userID, err := getUserID(r)
+		userID, err := h.getUserID(r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -115,7 +152,7 @@ func (h *URLHandler) HandleGetURLsByUserID() http.HandlerFunc {
 			return
 		}
 		// create and serialize response object into JSON
-		u, err := url.Parse(h.serverConfig.BaseURL)
+		u, err := url.Parse(h.cfg.BaseURL)
 		if err != nil {
 			log.Println("HandleGetURLsByUserID:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -160,14 +197,14 @@ func (h *URLHandler) HandlePostURL() http.HandlerFunc {
 			return
 		}
 		// retrieve user identifier
-		userID, err := getUserID(r)
+		userID, err := h.getUserID(r)
 		if err != nil {
 			log.Println("HandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// get server base URL
-		u, err := url.Parse(h.serverConfig.BaseURL)
+		u, err := url.Parse(h.cfg.BaseURL)
 		if err != nil {
 			log.Println("HandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -239,14 +276,14 @@ func (h *URLHandler) JSONHandlePostURL() http.HandlerFunc {
 			return
 		}
 		// retrieve user identifier
-		userID, err := getUserID(r)
+		userID, err := h.getUserID(r)
 		if err != nil {
 			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		// get server base URL
-		u, err := url.Parse(h.serverConfig.BaseURL)
+		u, err := url.Parse(h.cfg.BaseURL)
 		if err != nil {
 			log.Println("JSONHandlePostURL:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -325,8 +362,8 @@ func (h *URLHandler) HandlePingDB() http.HandlerFunc {
 }
 
 // getUserID retrieves user identifier as a value of cookie with key middleware.UserCookieKey.
-func getUserID(r *http.Request) (string, error) {
-	userCookie, err := r.Cookie(middleware.UserCookieKey)
+func (h *URLHandler) getUserID(r *http.Request) (string, error) {
+	userCookie, err := r.Cookie(h.cfg.AuthKey)
 	if err != nil {
 		return "", err
 	}
@@ -365,7 +402,7 @@ func (h *URLHandler) HandleDeleteURLBatch() http.HandlerFunc {
 			return
 		}
 		// retrieve user identifier
-		userID, err := getUserID(r)
+		userID, err := h.getUserID(r)
 		if err != nil {
 			log.Println("HandleDeleteURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -406,7 +443,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 			return
 		}
 		// retrieve user identifier
-		userID, err := getUserID(r)
+		userID, err := h.getUserID(r)
 		if err != nil {
 			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -420,7 +457,7 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 			return
 		}
 		// prepare url schema for sURL
-		u, err := url.Parse(h.serverConfig.BaseURL)
+		u, err := url.Parse(h.cfg.BaseURL)
 		if err != nil {
 			log.Println("JSONHandlePostURLBatch:", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -472,6 +509,5 @@ func (h *URLHandler) JSONHandlePostURLBatch() http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write(resBody)
-
 	}
 }
